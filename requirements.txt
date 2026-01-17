@@ -4,6 +4,7 @@ apscheduler
 asyncio
 bing_image_downloader
 bs4
+certifi
 deepai
 edge-tts
 ffmpeg-python
