@@ -16,4 +16,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://boda058961:$HF_TOKEN@huggingface.co/spaces/boda058961/Music Master
+          git push --force https://boda058961:$HF_TOKEN@huggingface.co/spaces/boda058961/Music Master:main
