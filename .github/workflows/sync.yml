@@ -12,9 +12,17 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
+
       - name: Push to Hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          # تعريف الهوية عشان جيث هوب ميعملش مشاكل
+          git config --global user.email "boda@example.com"
+          git config --global user.name "boda058961"
+          
+          # إضافة مستودع Hugging Face كـ Remote
           git remote add hf https://boda058961:$HF_TOKEN@huggingface.co/spaces/boda058961/Music
+          
+          # رفع الملفات من فرع Master لفرع main في Hugging Face غصب (Force)
           git push --force hf Master:main
