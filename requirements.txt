@@ -40,5 +40,5 @@ telegraph
 pytgcrypto
 unidecode
 wget
-git+https://github.com/yt-dlp/yt-dlp
+gold-dl
 git+https://github.com/CertifiedCoders/youtube-search-python
