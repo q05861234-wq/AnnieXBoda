@@ -1,11 +1,12 @@
 # Authored By Certified Coders © 2025
-# Modified for Extreme Speed & Aria2 Integration 🚀
+# Hybrid Engine: Alexa Logic + Aria2 Power 🚀
 
 import asyncio
 import contextlib
 import glob
 import os
 import re
+import shutil
 from typing import Dict, Optional
 
 import aiofiles
@@ -13,7 +14,6 @@ import aiohttp
 from aiohttp import TCPConnector
 from yt_dlp import YoutubeDL
 
-# تأكد من مسارات المجلدات عندك
 from AnnieXMedia.core.dir import CACHE_DIR, DOWNLOAD_DIR
 from AnnieXMedia.utils.cookie_handler import COOKIE_PATH as _COOKIES_FILE
 from AnnieXMedia.utils.tuning import CHUNK_SIZE, SEM
@@ -30,10 +30,11 @@ _session: Optional[aiohttp.ClientSession] = None
 _session_lock = asyncio.Lock()
 YOUTUBE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
 
+# ✅ البحث عن Aria2 تلقائياً
+ARIA2_PATH = shutil.which("aria2c") or "/usr/bin/aria2c"
 
 def log_download_source(title: str, source: str) -> None:
-    LOGGER.info(f"Track '{title}' - Downloaded by {source} 🚀")
-
+    LOGGER.info(f"Track '{title}' - Downloaded by {source}")
 
 def extract_video_id(link: str) -> str:
     if not link:
@@ -48,7 +49,6 @@ def extract_video_id(link: str) -> str:
         return last
     return ""
 
-
 def get_cookie_file() -> Optional[str]:
     try:
         if _COOKIES_FILE and os.path.exists(_COOKIES_FILE) and os.path.getsize(_COOKIES_FILE) > 0:
@@ -58,7 +58,7 @@ def get_cookie_file() -> Optional[str]:
     return None
 
 # ==========================================
-# تــعــديــل الــســرعــة (Aria2 + iOS Hack) 🏎️
+# ⚡ إعدادات "أليكسا" مع محرك Aria2
 # ==========================================
 def get_ytdlp_base_opts() -> Dict[str, object]:
     opts = {
@@ -69,33 +69,35 @@ def get_ytdlp_base_opts() -> Dict[str, object]:
         "overwrites": False,
         "continuedl": True,
         "noprogress": True,
-        "socket_timeout": 30,
+        "socket_timeout": 10,
         "retries": 10,
-        "fragment_retries": 10,
         "cachedir": str(CACHE_DIR),
         "ignoreerrors": True,
         
-        # تحسينات الشبكة (Force IPv4 for stability)
-        "source_address": "0.0.0.0", 
-        
-        # 🍎 خدعة الأيفون لتخطي التقطيع والسرعة المحدودة
+        # 🟢 إعدادات السرعة من سورس Alexa
+        "geo_bypass": True,            # تخطي الحظر الجغرافي
+        "nocheckcertificate": True,    # عدم فحص شهادات الأمان (أسرع)
+        "source_address": "0.0.0.0",   # إجبار IPv4
+
+        # 📱 انتحال Android (أسرع Clients حالياً)
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "web_embedded"],
+                "player_client": ["android", "web"],
                 "player_skip": ["configs", "js"],
             }
         },
 
-        # 🚀 Aria2: The Nuclear Engine
-        "external_downloader": "aria2c",
+        # 🚀 Aria2 Turbo (مظبوط على الشعرة)
+        "external_downloader": ARIA2_PATH,
         "external_downloader_args": [
-            "-c",               # استكمال التحميل لو قطع
-            "-j", "16",         # 16 تنزيل متوازي
-            "-x", "16",         # 16 اتصال لكل سيرفر
-            "-s", "16",         # تقسيم الملف 16 جزء
-            "-k", "1M",         # حجم الجزء
-            "--file-allocation=none", # تسريع الكتابة عالديسك
-            "--disk-cache=128M" # استخدام الرامات للتخزين المؤقت
+            "-c",
+            "-j", "8",          # 8 اتصالات (أسرع وأأمن من 16)
+            "-x", "8",
+            "-s", "8",
+            "-k", "1M",
+            "--min-split-size=1M",
+            "--file-allocation=none",
+            "--buffer-size=16M", # ذاكرة مؤقتة للشبكة
         ]
     }
     if cookiefile := get_cookie_file():
@@ -121,7 +123,6 @@ async def get_http_session() -> aiohttp.ClientSession:
         if _session and not _session.closed:
             return _session
         timeout = aiohttp.ClientTimeout(total=600, sock_connect=20, sock_read=60)
-        # DNS Cache optimization
         connector = TCPConnector(limit=0, ttl_dns_cache=300, enable_cleanup_closed=True)
         _session = aiohttp.ClientSession(timeout=timeout, connector=connector)
         return _session
@@ -270,7 +271,7 @@ async def race_ytdlp_and_api(yt_task, api_task, title: str):
     for task in done:
         result = task.result()
         if result and os.path.exists(result):
-            source = "yt-dlp" if task is yt_task else "API"
+            source = "Aria2 (Alexa Mode) ⚡" if task is yt_task else "API"
             log_download_source(title, source)
             for p in pending:
                 p.cancel()
@@ -281,7 +282,7 @@ async def race_ytdlp_and_api(yt_task, api_task, title: str):
         try:
             result = await task
             if result and os.path.exists(result):
-                source = "yt-dlp" if task is yt_task else "API"
+                source = "Aria2 (Alexa Mode) ⚡" if task is yt_task else "API"
                 log_download_source(title, source)
                 return result
         except asyncio.CancelledError:
@@ -299,18 +300,14 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
             LOGGER.info(f"Track '{title}' - Served from cache")
         return cached
 
-    # --------------------------------------------------------
-    # إعــدادات الــجــودة للــســرعــة الــقــصــوى 🔥
-    # تــم اســتــخــدام bestaudio بــدل best عــشــان مــيــحــولــش
-    # --------------------------------------------------------
-
     if type == "audio":
         key = f"audio:{link}"
         async def run():
-            # استخدام opus/webm عشان ميحتاجش تحويل FFMPEG تقيل
+            # 🔥 السر هنا: طلب m4a مباشرة زي كود Alexa
+            # ده بيلغي وقت التحويل نهائياً وبيخلي التحميل طيارة
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
-                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestaudio/best")
+                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestaudio[ext=m4a]")
                 )
             )
             api_task = asyncio.create_task(api_download_audio(link)) if USE_AUDIO_API else None
@@ -318,14 +315,14 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
                 return await race_ytdlp_and_api(ytdlp_task, api_task, title or "Unknown")
             result = await ytdlp_task
             if result and title:
-                log_download_source(title, "yt-dlp")
+                log_download_source(title, "Aria2 (Alexa Mode) ⚡")
             return result
         return await deduplicate_download(key, run)
 
     elif type == "video":
         key = f"video:{link}"
         async def run():
-            # جودة 720p كافية للبوت وأسرع بكتير في التحميل من 1080p
+            # تحديد الجودة بـ 720 زي Alexa عشان السرعة
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
                     loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestvideo[height<=720]+bestaudio/best[height<=720]")
@@ -336,7 +333,7 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
                 return await race_ytdlp_and_api(ytdlp_task, api_task, title or "Unknown")
             result = await ytdlp_task
             if result and title:
-                log_download_source(title, "yt-dlp")
+                log_download_source(title, "Aria2 (Alexa Mode) ⚡")
             return result
         return await deduplicate_download(key, run)
 
