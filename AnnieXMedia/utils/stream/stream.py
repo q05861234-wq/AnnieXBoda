@@ -1,5 +1,5 @@
 # Authored By Certified Coders © 2025
-# Optimized & Merged by TitanOS (Annie + Alexa + Brandrd)
+# Optimized by TitanOS (Annie Base + Alexa Style + Brandrd Safety)
 
 import os
 import asyncio
@@ -21,12 +21,14 @@ from AnnieXMedia.utils.stream.queue import put_queue, put_queue_index
 from AnnieXMedia.utils.thumbnails import get_thumb
 from AnnieXMedia.utils.errors import capture_internal_err
 
-# --- 🛡️ SAFETY FIRST: Safe Delete Function (From Brandrd) ---
+
+# --- 🛡️ إضافة دالة الحذف الآمن (من Brandrd) ---
 async def safe_delete(message):
     try:
         await message.delete()
     except:
         pass
+
 
 @capture_internal_err
 async def stream(
@@ -48,6 +50,7 @@ async def stream(
     forceplay = bool(forceplay)
     is_video = bool(video)
 
+    # إيقاف التشغيل الإجباري إذا تم طلبه
     if forceplay:
         await StreamController.force_stop_stream(chat_id)
 
@@ -91,15 +94,16 @@ async def stream(
                 msg += f"{count}. {title[:70]}\n"
                 msg += f"{_['play_20']} {position}\n\n"
             else:
-                if not forceplay:
+                # 🔥 إصلاح خطأ الـ KeyError (تأكد من وجود القائمة)
+                if chat_id not in db:
                     db[chat_id] = []
+                
                 try:
                     file_path, direct = await YouTube.download(
                         vidid, mystic, video=is_video, videoid=vidid
                     )
                 except Exception:
-                    # If download fails, skip safely
-                    continue 
+                    continue
 
                 await StreamController.join_call(
                     chat_id,
@@ -121,11 +125,10 @@ async def stream(
                     forceplay=forceplay,
                 )
                 
-                # --- Alexa Style Formatting ---
                 img = await get_thumb(vidid)
                 button = stream_markup(_, chat_id)
                 
-                # Using Try/Except block for FloodWait (Brandrd Feature)
+                # حماية ضد FloodWait وتنسيق أليكسا
                 try:
                     run = await app.send_photo(
                         original_chat_id,
@@ -210,10 +213,10 @@ async def stream(
                 reply_markup=InlineKeyboardMarkup(button),
             )
         else:
-            if not forceplay:
+            # 🔥 الحل الجذري لمشكلة الـ KeyError
+            if chat_id not in db:
                 db[chat_id] = []
-            
-            # Start Streaming
+                
             await StreamController.join_call(
                 chat_id,
                 original_chat_id,
@@ -254,7 +257,6 @@ async def stream(
                 db[chat_id][0]["markup"] = "stream"
             except FloodWait as e:
                 await asyncio.sleep(e.value)
-                # Retry once
                 run = await app.send_photo(
                     original_chat_id,
                     photo=img,
@@ -301,8 +303,9 @@ async def stream(
                 reply_markup=InlineKeyboardMarkup(button),
             )
         else:
-            if not forceplay:
+            if chat_id not in db:
                 db[chat_id] = []
+                
             await StreamController.join_call(chat_id, original_chat_id, file_path, video=False)
             await put_queue(
                 chat_id,
@@ -363,8 +366,9 @@ async def stream(
                 reply_markup=InlineKeyboardMarkup(button),
             )
         else:
-            if not forceplay:
+            if chat_id not in db:
                 db[chat_id] = []
+                
             await StreamController.join_call(chat_id, original_chat_id, file_path, video=is_video)
             await put_queue(
                 chat_id,
@@ -423,8 +427,9 @@ async def stream(
                 reply_markup=InlineKeyboardMarkup(button),
             )
         else:
-            if not forceplay:
+            if chat_id not in db:
                 db[chat_id] = []
+                
             n, file_path = await YouTube.video(link)
             if n == 0:
                 await safe_delete(mystic)
@@ -475,7 +480,7 @@ async def stream(
     # ==========================
     elif streamtype == "index":
         link = result
-        title = "رابط خارجي أو M3u8"
+        title = "ɪɴᴅᴇx ᴏʀ ᴍ3ᴜ8 ʟɪɴᴋ"
         duration_min = "00:00"
 
         if await is_active_chat(chat_id):
@@ -496,8 +501,9 @@ async def stream(
                 reply_markup=InlineKeyboardMarkup(button),
             )
         else:
-            if not forceplay:
+            if chat_id not in db:
                 db[chat_id] = []
+                
             await StreamController.join_call(
                 chat_id,
                 original_chat_id,
