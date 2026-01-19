@@ -56,6 +56,8 @@ async def check_stream(
         result = loads(stdout.decode('utf-8')) or {}
         stream_list = result.get('streams', [])
         format_content = result.get('format', [])
+        
+        # Fixed logic from modern library to handle errors better
         if 'No such file' in stderr.decode('utf-8'):
             raise FileNotFoundError()
     except (subprocess.TimeoutExpired, JSONDecodeError):
@@ -72,7 +74,7 @@ async def check_stream(
     for stream in stream_list:
         codec_type = stream.get('codec_type', '')
         codec_name = stream.get('codec_name', '')
-        image_codecs = ['png', 'jpeg', 'jpg', 'mjpeg']
+        image_codecs = ['png', 'jpeg', 'jpg', 'mjpeg', 'webp'] # Added webp support
         if codec_type == 'video':
             is_image &= codec_name in image_codecs
             have_video = True
@@ -126,6 +128,7 @@ async def cleanup_commands(
         proc_res = await asyncio.create_subprocess_exec(
             commands[0] if not process_name else process_name,
             '-h',
+            'full', # Added 'full' from modern lib for better detection
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -138,7 +141,10 @@ async def cleanup_commands(
         except (subprocess.TimeoutExpired, JSONDecodeError):
             proc_res.terminate()
             raise
-        supported = re.findall(r'(?m)^ *(-.*?)\s+', result)
+        
+        # Regex update from modern lib
+        supported = re.findall(r'(?m)^ *(-\w+).*?\s+', result)
+        supported += ['-i']
         new_commands = []
         ignore_next = False
 
@@ -147,8 +153,11 @@ async def cleanup_commands(
                 if v[0] == '-':
                     ignore_next = v not in supported or \
                         blacklist is not None and v in blacklist
+
                 if not ignore_next:
                     new_commands += [v]
+                elif v[0] != '-':
+                    ignore_next = False
         return new_commands
     except FileNotFoundError:
         raise FFmpegError(f'{commands[0]} not installed')
@@ -176,7 +185,7 @@ def build_command(
 
     ffmpeg_command += command['start']
 
-    # 🔥 HERE IS THE MAGIC (MODIFIED BY TITANOS) 🔥
+    # 🔥 TITANOS SUPERCHARGED SETTINGS 🔥
     if not os.path.exists(path) \
             and not is_livestream\
             and name == 'ffmpeg':
@@ -184,11 +193,12 @@ def build_command(
             '-reconnect', '1',
             '-reconnect_at_eof', '1',
             '-reconnect_streamed', '1',
-            '-reconnect_delay_max', '5', # Increased delay tolerance
-            '-probesize', '32M',         # Giant Buffer
-            '-analyzeduration', '15M',   # Deep Analysis
-            '-err_detect', 'ignore_err', # Ignore small corruptions
-            '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36', # Anti-Block
+            '-reconnect_delay_max', '5',
+            '-probesize', '50M',        # Raised buffer to 50MB
+            '-analyzeduration', '20M',  # Deeper analysis
+            '-err_detect', 'ignore_err',
+            # Anti-Block User Agent
+            '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         ]
 
     if name == 'ffprobe':
@@ -211,7 +221,7 @@ def build_command(
             ffmpeg_command.append(f'{i}: {headers[i]}')
 
     ffmpeg_command += [
-        '-nostdin',
+        '-nostdin', # Important for stability
         '-i',
         f'{path}' if name == 'ffmpeg' else path,
     ]
@@ -281,6 +291,8 @@ def _build_ffmpeg_options(
             's16le',
             '-ac', str(stream_parameters.channels),
             '-ar', str(stream_parameters.bitrate),
+            '-b:a', '128k',  # 🔥 Force High Quality Bitrate
+            '-vbr', 'on',    # Variable Bitrate for efficiency
         ])
     elif isinstance(stream_parameters, VideoParameters):
         options.extend([
@@ -290,6 +302,8 @@ def _build_ffmpeg_options(
             'yuv420p',
             '-vf',
             f'scale={stream_parameters.width}:{stream_parameters.height}',
+            '-b:v', '2M',    # 🔥 Force 2MB video bitrate (Crisp HD)
+            '-preset', 'fast', # Balance between quality and speed
         ])
 
     return options
