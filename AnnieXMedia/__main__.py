@@ -3,19 +3,50 @@ import asyncio
 import sys
 import os
 import importlib
+import psutil
+import logging
 
 # ==========================================
-# تــفــعــيــل مــحــرك UVLoop
+# 1. تــجــهــيــز الــنــظــام الــصــاروخــي (System Setup)
 # ==========================================
+# ننشئ اللوب يدوياً لتجنب مشاكل pytgcalls
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+# (Monkey Patch) الحل السحري لمشكلة Python 3.12
+# بنجبر بايثون يستخدم اللوب بتاعنا لما أي مكتبة تطلب get_event_loop
+asyncio.get_event_loop = lambda: loop
+
+# تفعيل UVLoop إذا كان متاحاً
 try:
     import uvloop
-    uvloop.install()
-    print("تــم تــفــعــيــل مــحــرك UVLoop بــنــجــاح... الــســرعــة الــقــصــوى")
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    print("✅ تــم تــفــعــيــل UVLoop بــنــجــاح")
 except ImportError:
-    print("مــحــرك UVLoop غــيــر مــثــبــت... جــاري الــعــمــل بــالــنــظــام الافــتــراضــي")
+    print("⚠️ UVLoop غــيــر مــثــبــت")
 
 # ==========================================
+# 2. تــفــعــيــل قــوة الــ 16 كــور (Max Performance)
+# ==========================================
+def activate_16_cores():
+    try:
+        # السماح باستخدام كافة الأنوية
+        os.environ["OMP_NUM_THREADS"] = "auto"
+        
+        p = psutil.Process(os.getpid())
+        # توزيع الحمل على جميع الـ Cores المتاحة
+        p.cpu_affinity(list(range(psutil.cpu_count())))
+        # رفع الأولوية
+        p.nice(-10) 
+        print(f"🚀 تــم تــحــريــر قــوة الــ {psutil.cpu_count()} أنــويــة بــالــكــامــل")
+    except Exception as e:
+        print(f"⚠️ مــلاحــظــة: {e}")
 
+activate_16_cores()
+
+# ==========================================
+# 3. الاســتــدعــاءات الــطــبــيــعــيــة
+# ==========================================
 sys.path.insert(0, os.getcwd())
 
 from pyrogram import idle
@@ -50,7 +81,6 @@ async def init():
         LOGGER("AnnieXMedia").info("تــم تــحــمــيــل الــكــوكــيــز بــنــجــاح")
     except Exception as e:
         LOGGER("AnnieXMedia").warning(f"تــحــذيــر بــخــصــوص الــكــوكــيــز: {e}")
-
 
     await sudo()
 
@@ -96,8 +126,8 @@ async def init():
     
     # رسالة التشغيل النهائية
     LOGGER("AnnieXMedia").info(
-        "تــم تــشــغــيــل ســورس آنــي مــيــوزك بــنــجــاح...\n"
-        "الــنــظــام يــعــمــل الآن بــكــفــاءة عــالــيــة"
+        f"تــم تــشــغــيــل ســورس آنــي مــيــوزك بــنــجــاح...\n"
+        f"عــلــى ســيــرفــر بــقــوة: {psutil.cpu_count()} Cores / UVLoop Active"
     )
     
     await idle()
@@ -109,5 +139,11 @@ async def init():
 
 
 if __name__ == "__main__":
-    # تشغيل الدالة باستخدام Loop مهيأ مسبقاً بـ uvloop
-    asyncio.get_event_loop().run_until_complete(init())
+    # التعديل الهام هنا: نستخدم اللوب اللي أنشأناه فوق بدلاً من إنشاء واحد جديد
+    try:
+        loop.run_until_complete(init())
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f"Error: {e}")
