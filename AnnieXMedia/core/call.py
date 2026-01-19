@@ -1,8 +1,7 @@
 # Authored By Certified Coders © 2025
-# Optimized by TitanOS (Direct FFMPEG Injection + Auto-Scaling + Stereo Force)
-
 import asyncio
 import os
+import math
 from datetime import datetime, timedelta
 from typing import Union
 
@@ -48,27 +47,52 @@ from AnnieXMedia.utils.errors import capture_internal_err
 autoend = {}
 counter = {}
 
-# --- 🔥 TitanOS Logic: Auto-Detect Hardware ---
-try:
-    # بيحاول يجيب الكورات المسموح بيها للعملية (الأدق للسيرفرات)
-    TITAN_CORES = len(os.sched_getaffinity(0))
-except AttributeError:
-    # لو فشل (ويندوز مثلاً) بيجيب عدد الكورات الكلي
-    TITAN_CORES = os.cpu_count() or 2
-
-LOGGER(__name__).info(f"✅ TitanOS Engine Initialized: Utilizing {TITAN_CORES} CPU Cores for FFMPEG.")
-
-# --- 🔥 FFMPEG Raw Injection Strings ---
-# هنا بنبني أوامر FFMPEG اللي هتتفرض على المكتبة فرضاً
-# -threads: السرعة
-# -ac 2: ستيريو
-# -ar 48000: نقاء الصوت
-# -probesize/-analyzeduration: المخزن (Buffer) لمنع التقطيع
-TITAN_FLAGS = f"-threads {TITAN_CORES} -ac 2 -ar 48000 -probesize 100M -analyzeduration 100M -preset ultrafast"
-
+# --- 🔥 TITANOS V2: EXTREME ADAPTIVE PERFORMANCE ---
 def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = None) -> MediaStream:
-    # دمج الفلاجز الأساسية مع أي فلاجز إضافية (زي التقديم والتأخير)
-    final_params = f"{TITAN_FLAGS} {ffmpeg_params}" if ffmpeg_params else TITAN_FLAGS
+    # 1. Advanced Core Detection
+    # We leave 1 core free for OS tasks to prevent freezing
+    total_cores = os.cpu_count() or 1
+    usable_cores = max(1, total_cores - 1) if total_cores > 2 else total_cores
+    
+    # 2. Logic Matrix
+    if total_cores <= 2:
+        # 🔻 LOW END (1-2 Cores) -> Focus on Speed & Stability
+        threads = str(usable_cores)
+        preset = "ultrafast" # Zero lag priority
+        probe = "6M"         # Small buffer for quick start
+        analyze = "3M"
+        crf = "30"           # Lower bitrate to save CPU
+    elif total_cores <= 4:
+        # 🔸 MID RANGE (3-4 Cores) -> Balanced
+        threads = str(usable_cores)
+        preset = "veryfast"
+        probe = "15M"
+        analyze = "10M"
+        crf = "26"
+    else:
+        # 🟢 HIGH END (8-16 Cores) -> Focus on Quality (Cinematic)
+        threads = str(min(usable_cores, 16)) 
+        preset = "fast"      # Better compression quality
+        probe = "50M"        # Massive buffer
+        analyze = "25M"
+        crf = "23"           # High quality visuals
+
+    # 3. Build The Ultimate Command
+    base_params = (
+        f"-threads {threads} "
+        f"-preset {preset} "
+        f"-probesize {probe} "
+        f"-analyzeduration {analyze} "
+    )
+    
+    # Add CRF for video quality control if video is enabled
+    if video:
+        base_params += f"-crf {crf} "
+
+    if ffmpeg_params:
+        ffmpeg_params = base_params + ffmpeg_params
+    else:
+        ffmpeg_params = base_params
 
     if video:
         return MediaStream(
@@ -77,7 +101,7 @@ def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = No
             video_parameters=VideoQuality.HD_720p,
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.REQUIRED,
-            ffmpeg_parameters=final_params, # 💉 الحقن المباشر
+            ffmpeg_parameters=ffmpeg_params,
         )
     else:
         return MediaStream(
@@ -85,7 +109,7 @@ def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = No
             audio_parameters=AudioQuality.STUDIO,
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.IGNORE,
-            ffmpeg_parameters=final_params, # 💉 الحقن المباشر
+            ffmpeg_parameters=ffmpeg_params,
         )
 
 async def _clear_(chat_id: int) -> None:
@@ -99,33 +123,43 @@ async def _clear_(chat_id: int) -> None:
 
 class Call:
     def __init__(self):
-        # Increased cache duration to prevent re-fetching on slight net glitches
+        # 🔥 TitanOS Smart Cache
+        # Dynamically calculate cache based on available RAM/CPU logic
+        cores = os.cpu_count() or 1
+        if cores <= 2:
+            smart_cache = 50   # Keep RAM usage low
+        elif cores <= 4:
+            smart_cache = 100  # Standard
+        else:
+            smart_cache = 200  # Max stability
+
         self.userbot1 = Client(
             "AnnieXAssis1", config.API_ID, config.API_HASH, session_string=config.STRING1
         ) if config.STRING1 else None
-        self.one = PyTgCalls(self.userbot1, cache_duration=200) if self.userbot1 else None
+        self.one = PyTgCalls(self.userbot1, cache_duration=smart_cache) if self.userbot1 else None
 
         self.userbot2 = Client(
             "AnnieXAssis2", config.API_ID, config.API_HASH, session_string=config.STRING2
         ) if config.STRING2 else None
-        self.two = PyTgCalls(self.userbot2, cache_duration=200) if self.userbot2 else None
+        self.two = PyTgCalls(self.userbot2, cache_duration=smart_cache) if self.userbot2 else None
 
         self.userbot3 = Client(
             "AnnieXAssis3", config.API_ID, config.API_HASH, session_string=config.STRING3
         ) if config.STRING3 else None
-        self.three = PyTgCalls(self.userbot3, cache_duration=200) if self.userbot3 else None
+        self.three = PyTgCalls(self.userbot3, cache_duration=smart_cache) if self.userbot3 else None
 
         self.userbot4 = Client(
             "AnnieXAssis4", config.API_ID, config.API_HASH, session_string=config.STRING4
         ) if config.STRING4 else None
-        self.four = PyTgCalls(self.userbot4, cache_duration=200) if self.userbot4 else None
+        self.four = PyTgCalls(self.userbot4, cache_duration=smart_cache) if self.userbot4 else None
 
         self.userbot5 = Client(
             "AnnieXAssis5", config.API_ID, config.API_HASH, session_string=config.STRING5
         ) if config.STRING5 else None
-        self.five = PyTgCalls(self.userbot5, cache_duration=200) if self.userbot5 else None
+        self.five = PyTgCalls(self.userbot5, cache_duration=smart_cache) if self.userbot5 else None
 
         self.active_calls: set[int] = set()
+        self.turbo_mode = {} 
 
     @capture_internal_err
     async def pause_stream(self, chat_id: int) -> None:
@@ -200,7 +234,6 @@ class Call:
     @capture_internal_err
     async def seek_stream(self, chat_id: int, file_path: str, to_seek: str, duration: str, mode: str) -> None:
         assistant = await group_assistant(self, chat_id)
-        # دمجنا فلاجز التيتان مع فلاجز التقديم
         ffmpeg_params = f"-ss {to_seek} -to {duration}"
         is_video = mode == "video"
         stream = dynamic_media_stream(path=file_path, video=is_video, ffmpeg_params=ffmpeg_params)
@@ -217,10 +250,13 @@ class Call:
         os.makedirs(chatdir, exist_ok=True)
         out = os.path.join(chatdir, base)
 
+        # Smart Speedup Processing - Uses same logic as main stream
+        cores = os.cpu_count() or 1
+        speed_threads = str(max(1, cores - 1)) # Use almost all cores
+        
         if not os.path.exists(out):
             vs = str(2.0 / float(speed))
-            # 🔥 حتى في عملية التحويل، بنستخدم كل الكورات
-            cmd = f'ffmpeg -threads {TITAN_CORES} -i "{file_path}" -filter:v "setpts={vs}*PTS" -filter:a atempo={speed} -y "{out}"'
+            cmd = f'ffmpeg -threads {speed_threads} -i "{file_path}" -filter:v "setpts={vs}*PTS" -filter:a atempo={speed} -y "{out}"'
             proc = await asyncio.create_subprocess_shell(
                 cmd,
                 stdin=asyncio.subprocess.PIPE,
@@ -232,8 +268,6 @@ class Call:
         played, con_seconds = speed_converter(playing[0]["played"], speed)
         duration_min = seconds_to_min(dur)
         is_video = playing[0]["streamtype"] == "video"
-        
-        # بنضيف التيتان فلاجز هنا كمان
         ffmpeg_params = f"-ss {played} -to {duration_min}"
         stream = dynamic_media_stream(path=out, video=is_video, ffmpeg_params=ffmpeg_params)
 
@@ -255,8 +289,7 @@ class Call:
     async def stream_call(self, link: str) -> None:
         assistant = await group_assistant(self, config.LOGGER_ID)
         try:
-            # هنا كمان بنستخدم الدالة المحسنة
-            await assistant.play(config.LOGGER_ID, dynamic_media_stream(link))
+            await assistant.play(config.LOGGER_ID, MediaStream(link))
             await asyncio.sleep(8)
         finally:
             try:
@@ -276,8 +309,6 @@ class Call:
         assistant = await group_assistant(self, chat_id)
         lang = await get_lang(chat_id)
         _ = get_string(lang)
-        
-        # 🔥 الاعتماد الكلي على الدالة المحسنة
         stream = dynamic_media_stream(path=link, video=bool(video))
         ksk = GroupCallConfig(auto_start=False)
 
@@ -368,6 +399,7 @@ class Call:
                 if n == 0:
                     return await app.send_message(original_chat_id, text=_["call_6"])
                 stream = dynamic_media_stream(path=link, video=video)
+                
                 try:
                     await client.play(chat_id, stream)
                 except Exception:
