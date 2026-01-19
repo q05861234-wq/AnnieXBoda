@@ -40,4 +40,4 @@ print('PYTGCALLS_FROM=', getattr(pytgcalls,'__file__','<not found>'))
 PY
 
 # نقطة الدخول
-CMD ["python3", "runner.py"]
+CMD ["python3", "-m", "AnnieXMedia"]
