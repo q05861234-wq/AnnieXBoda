@@ -1,12 +1,22 @@
 # Authored By Certified Coders © 2025
+import asyncio
 import sys
 import os
-
-# السطر ده بيجبر البوت يستخدم مجلد pytgcalls المحلي بدل اللي نازل من النت
-sys.path.insert(0, os.getcwd())
-
-import asyncio
 import importlib
+
+# ==========================================
+# تــفــعــيــل مــحــرك UVLoop
+# ==========================================
+try:
+    import uvloop
+    uvloop.install()
+    print("تــم تــفــعــيــل مــحــرك UVLoop بــنــجــاح... الــســرعــة الــقــصــوى")
+except ImportError:
+    print("مــحــرك UVLoop غــيــر مــثــبــت... جــاري الــعــمــل بــالــنــظــام الافــتــراضــي")
+
+# ==========================================
+
+sys.path.insert(0, os.getcwd())
 
 from pyrogram import idle
 from pytgcalls.exceptions import NoActiveGroupCall
@@ -22,6 +32,7 @@ from config import BANNED_USERS
 
 
 async def init():
+    # التحقق من الجلسات
     if (
         not config.STRING1
         and not config.STRING2
@@ -29,19 +40,21 @@ async def init():
         and not config.STRING4
         and not config.STRING5
     ):
-        LOGGER(__name__).error("ᴀssɪsᴛᴀɴᴛ sᴇssɪᴏɴ ɴᴏᴛ ғɪʟʟᴇᴅ, ᴘʟᴇᴀsᴇ ғɪʟʟ ᴀ ᴘʏʀᴏɢʀᴀᴍ sᴇssɪᴏɴ...")
+        LOGGER(__name__).error("خــطــأ: كــود جــلــســة الــمــســاعــد مــفــقــود... يــرجــى إضــافــة الــكــود")
         exit()
 
-    # ✅ Try to fetch cookies at startup
+    # تحميل الكوكيز
     try:
+        LOGGER("AnnieXMedia").info("جــاري جــلــب مــلــفــات الــكــوكــيــز مــن الــخــادم...")
         await fetch_and_store_cookies()
-        LOGGER("AnnieXMedia").info("ʏᴏᴜᴛᴜʙᴇ ᴄᴏᴏᴋɪᴇs ʟᴏᴀᴅᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ ✅")
+        LOGGER("AnnieXMedia").info("تــم تــحــمــيــل الــكــوكــيــز بــنــجــاح")
     except Exception as e:
-        LOGGER("AnnieXMedia").warning(f"⚠️ᴄᴏᴏᴋɪᴇ ᴇʀʀᴏʀ: {e}")
+        LOGGER("AnnieXMedia").warning(f"تــحــذيــر بــخــصــوص الــكــوكــيــز: {e}")
 
 
     await sudo()
 
+    # تحميل المحظورين
     try:
         users = await get_gbanned()
         for user_id in users:
@@ -49,37 +62,52 @@ async def init():
         users = await get_banned_users()
         for user_id in users:
             BANNED_USERS.add(user_id)
+        LOGGER("AnnieXMedia").info(f"تــم تــحــمــيــل {len(BANNED_USERS)} مــســتــخــدم فــي قــائــمــة الــحــظــر")
     except:
         pass
 
+    # تشغيل البوت
+    LOGGER("AnnieXMedia").info("جــاري بــدء تــشــغــيــل عــمــيــل الــبــوت...")
     await app.start()
+    
+    # تحميل الملحقات
     for all_module in ALL_MODULES:
         importlib.import_module("AnnieXMedia.plugins" + all_module)
 
-    LOGGER("AnnieXMedia.plugins").info("ᴀɴɴɪᴇ's ᴍᴏᴅᴜʟᴇs ʟᴏᴀᴅᴇᴅ...")
+    LOGGER("AnnieXMedia.plugins").info("تــم اســتــيــراد جــمــيــع مــلــفــات الــبــوت بــنــجــاح...")
 
+    # تشغيل اليوزربوت والمكالمات
+    LOGGER("AnnieXMedia").info("جــاري تــشــغــيــل الــحــســاب الــمــســاعــد...")
     await userbot.start()
     await StreamController.start()
 
+    # فحص الكول
     try:
         await StreamController.stream_call("http://docs.evostream.com/sample_content/assets/sintel1m720p.mp4")
     except NoActiveGroupCall:
         LOGGER("AnnieXMedia").error(
-            "ᴘʟᴇᴀsᴇ ᴛᴜʀɴ ᴏɴ ᴛʜᴇ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ᴏғ ʏᴏᴜʀ ʟᴏɢ ɢʀᴏᴜᴘ/ᴄʜᴀɴɴᴇʟ.\n\nᴀɴɴɪᴇ ʙᴏᴛ sᴛᴏᴘᴘᴇᴅ..."
+            "الــمــحــادثــة الــصــوتــيــة مــغــلــقــة...\nيــرجــى فــتــح الــكــول فــي جــروب الــســجــل"
         )
         exit()
     except:
         pass
 
     await StreamController.decorators()
+    
+    # رسالة التشغيل النهائية
     LOGGER("AnnieXMedia").info(
-        "\x41\x6e\x6e\x69\x65\x20\x4d\x75\x73\x69\x63\x20\x52\x6f\x62\x6f\x74\x20\x53\x74\x61\x72\x74\x65\x64\x20\x53\x75\x63\x63\x65\x73\x73\x66\x75\x6c\x6c\x79\x2e\x2e\x2e"
+        "تــم تــشــغــيــل ســورس آنــي مــيــوزك بــنــجــاح...\n"
+        "الــنــظــام يــعــمــل الآن بــكــفــاءة عــالــيــة"
     )
+    
     await idle()
+    
+    # الإغلاق
     await app.stop()
     await userbot.stop()
-    LOGGER("AnnieXMedia").info("sᴛᴏᴘᴘɪɴɢ ᴀɴɴɪᴇ ᴍᴜsɪᴄ ʙᴏᴛ ...")
+    LOGGER("AnnieXMedia").info("تــم إيــقــاف بــوت آنــي مــيــوزك بــنــجــاح...")
 
 
 if __name__ == "__main__":
+    # تشغيل الدالة باستخدام Loop مهيأ مسبقاً بـ uvloop
     asyncio.get_event_loop().run_until_complete(init())
