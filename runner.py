@@ -2,44 +2,56 @@ import asyncio
 import logging
 import os
 import sys
-import time
 import psutil
 
 # ==========================================
-# 1. الإصــلاح الــجــذري للـ Loop (The Fix)
+# 1. الــحــل الــنــهــائــي (Loop Initialization)
 # ==========================================
-# بـدلاً مـن install، سـنـقـوم بـفـرض الـسـيـاسـة يـدويـاً
-# هـذا يـجـعـل بـايـثـون 3.12 يـعـتـرف بـالـ Loop فـوراً
+# الخطوة دي لازم تحصل قبل أي import لأي مكتبة تانية
 try:
     import uvloop
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-    print("✅ تــم فــرض ســيــاســة UVLoop بــنــجــاح")
+    print("✅ تــم تــحــمــيــل UVLoop فــي الــمــشــغــل")
 except ImportError:
-    print("⚠️ UVLoop غــيــر مــثــبــت")
+    pass
 
-# إنــشــاء الــ Loop وتــثــبــيــتــه "غــصــب" عــن الــنــظــام
-# هـذا الـسـطـر هـو الـذي يـمـنـع خـطـأ RuntimeError
+# بنصنع اللوب يدوياً
 main_loop = asyncio.new_event_loop()
 asyncio.set_event_loop(main_loop)
 
+# (Monkey Patch)
+# بنجبر بايثون ومكتبة الاتصال يستخدموا اللوب ده غصب
+# ده بيحل مشكلة RuntimeError: There is no current event loop
+asyncio.get_event_loop = lambda: main_loop
+
 # ==========================================
-# 2. تــفــعــيــل الــســرعــة الــقــصــوى (Full Speed)
+# 2. تــفــعــيــل الــ 16 كــور (Hardware Power)
 # ==========================================
-def set_max_priority():
+def inject_power():
     try:
+        # السماح باستخدام كل الموارد
+        os.environ["OMP_NUM_THREADS"] = "auto"
+        
+        # توزيع الحمل على جميع الأنوية
         p = psutil.Process(os.getpid())
-        # الـقـيـمـة -10 تـعـطـي أولـويـة أعـلـى مـن الـنـظـام الـعـادي
-        p.nice(-10)
-        print("🚀 تــم تــفــعــيــل وضــع الــأداء الــأقــصــى (High Priority)")
+        p.cpu_affinity(list(range(psutil.cpu_count())))
+        
+        # رفع الأولوية (High Priority)
+        try:
+            p.nice(-10)
+        except:
+            pass
+            
+        print(f"🚀 الــمــشــغــل يــعــمــل بــقــوة {psutil.cpu_count()} أنــويــة")
     except Exception as e:
-        print(f"تــنــبــيــه: لــم نــتــمــكــن مــن رفــع الأولــويــة ({e})")
+        print(f"⚠️ {e}")
 
-# تــنــفــيــذ الأولــويــة فــوراً
-set_max_priority()
+inject_power()
 
 # ==========================================
-# 3. اســتــدعــاء الــبــوت (بــعــد الــتــثــبــيــت)
+# 3. بــدء الــبــوت
 # ==========================================
+# دلوقتي نقدر نستدعي ملفات البوت بأمان
 from AnnieXMedia.__main__ import init
 from AnnieXMedia import LOGGER
 
@@ -49,36 +61,12 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-# ==========================================
-# مــراقــب الــنــظــام الــســريــع
-# ==========================================
-async def server_status_monitor():
-    while True:
-        await asyncio.sleep(14400)
-        try:
-            cpu = psutil.cpu_percent(interval=1)
-            ram = psutil.virtual_memory()
-            
-            LOGGER("SystemMonitor").info(
-                f"تــقــريــر الــســرعــة :\n"
-                f"___________________\n"
-                f"الــضــغــط عــلــى الــمــعــالــج : {cpu}%\n"
-                f"اســتــهــلاك الــذاكــرة : {ram.percent}%\n"
-                f"وضــع الــتــشــغــيــل : Full Speed / UVLoop Active"
-            )
-        except:
-            pass
-
-# ==========================================
-# الــتــشــغــيــل الــنــهــائــي
-# ==========================================
 if __name__ == "__main__":
     try:
-        # نــســتــخــدم الــ Loop الــذي أنــشــأنــاه بــالأعــلــى
-        main_loop.create_task(server_status_monitor())
+        # بنستخدم اللوب اللي جهزناه فوق
         main_loop.run_until_complete(init())
         main_loop.run_forever()
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f"خــطــأ غــيــر مــتــوقــع : {e}")
+        print(f"Critical Error: {e}")
