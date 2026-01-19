@@ -1,8 +1,10 @@
 # Authored By Certified Coders © 2025
-# Optimized by TitanOS (MessageIdInvalid Fix)
+# Optimized by TitanOS (Advanced Logging & Debugging)
 
 import os
 import asyncio
+import traceback
+import sys
 from random import randint
 from typing import Union
 
@@ -10,7 +12,7 @@ from pyrogram.types import InlineKeyboardMarkup
 from pyrogram.errors import FloodWait
 
 import config
-from AnnieXMedia import Carbon, YouTube, app
+from AnnieXMedia import Carbon, YouTube, app, LOGGER
 from AnnieXMedia.core.call import StreamController
 from AnnieXMedia.misc import db
 from AnnieXMedia.utils.database import add_active_video_chat, is_active_chat
@@ -50,6 +52,9 @@ async def stream(
     forceplay = bool(forceplay)
     is_video = bool(video)
 
+    # طباعة رسالة بداية التشغيل في اللوج
+    LOGGER(__name__).info(f"🔄 Processing Stream Request | Chat: {chat_id} | Type: {streamtype}")
+
     if forceplay:
         await StreamController.force_stop_stream(chat_id)
 
@@ -68,7 +73,8 @@ async def stream(
                 title, duration_min, duration_sec, thumbnail, vidid = await YouTube.details(
                     search, videoid=search
                 )
-            except Exception:
+            except Exception as e:
+                LOGGER(__name__).error(f"❌ Failed to fetch playlist item details: {e}")
                 continue
 
             if str(duration_min) == "None":
@@ -100,16 +106,23 @@ async def stream(
                     file_path, direct = await YouTube.download(
                         vidid, mystic, video=is_video, videoid=vidid
                     )
-                except Exception:
+                except Exception as e:
+                    LOGGER(__name__).error(f"❌ Playlist Download Failed for {vidid}: {e}")
+                    LOGGER(__name__).error(traceback.format_exc())
                     continue
 
-                await StreamController.join_call(
-                    chat_id,
-                    original_chat_id,
-                    file_path,
-                    video=is_video,
-                    image=thumbnail,
-                )
+                try:
+                    await StreamController.join_call(
+                        chat_id,
+                        original_chat_id,
+                        file_path,
+                        video=is_video,
+                        image=thumbnail,
+                    )
+                except Exception as e:
+                    LOGGER(__name__).error(f"❌ Failed to join call in playlist mode: {e}")
+                    continue
+
                 await put_queue(
                     chat_id,
                     original_chat_id,
@@ -140,7 +153,8 @@ async def stream(
                     )
                     db[chat_id][0]["mystic"] = run
                     db[chat_id][0]["markup"] = "stream"
-                except Exception:
+                except Exception as e:
+                    LOGGER(__name__).warning(f"⚠️ Failed to send playlist playing photo: {e}")
                     pass
 
         if count == 0:
@@ -181,12 +195,14 @@ async def stream(
             file_path, direct = await YouTube.download(
                 vidid, mystic, video=is_video, videoid=vidid
             )
-        except Exception:
-            # ⚠️ شلنا الحذف من هنا عشان ملف play.py يعرف يعرض الخطأ
+        except Exception as e:
+            # 🔴 هنا هيطبع الخطأ في التيرمينال
+            LOGGER(__name__).error(f"❌ YouTube Download Failed: {e}")
+            LOGGER(__name__).error(traceback.format_exc())
             raise AssistantErr(_["play_14"])
         
         if not file_path:
-            # ⚠️ وهنا كمان
+            LOGGER(__name__).error("❌ File Path is None after download.")
             raise AssistantErr(_["play_14"])
 
         if await is_active_chat(chat_id):
@@ -212,14 +228,22 @@ async def stream(
         else:
             if chat_id not in db:
                 db[chat_id] = []
-                
-            await StreamController.join_call(
-                chat_id,
-                original_chat_id,
-                file_path,
-                video=is_video,
-                image=thumbnail,
-            )
+            
+            try:
+                await StreamController.join_call(
+                    chat_id,
+                    original_chat_id,
+                    file_path,
+                    video=is_video,
+                    image=thumbnail,
+                )
+            except Exception as e:
+                # 🔴 هنا هيطبع سبب فشل الكول
+                LOGGER(__name__).error(f"❌ Failed to Join Call: {e}")
+                LOGGER(__name__).error(traceback.format_exc())
+                # بنحاول نشغل ملف تاني لو فشل، أو بنرجع خطأ
+                raise AssistantErr(_["call_8"])
+
             await put_queue(
                 chat_id,
                 original_chat_id,
@@ -235,7 +259,7 @@ async def stream(
             
             img = await get_thumb(vidid)
             button = stream_markup(_, chat_id)
-            await safe_delete(mystic) # هنا نحذف عادي لأننا هنبعت الصورة بنجاح
+            await safe_delete(mystic)
             
             try:
                 run = await app.send_photo(
@@ -266,6 +290,8 @@ async def stream(
                 )
                 db[chat_id][0]["mystic"] = run
                 db[chat_id][0]["markup"] = "stream"
+            except Exception as e:
+                LOGGER(__name__).error(f"❌ Failed to send playing message: {e}")
 
     # ==========================
     # 3. SOUNDCLOUD MODE
@@ -275,7 +301,7 @@ async def stream(
         title = result["title"]
         duration_min = result["duration_min"]
         if not file_path:
-            # ⚠️ شلنا الحذف
+            LOGGER(__name__).error("❌ SoundCloud: File Path missing.")
             raise AssistantErr(_["play_14"])
 
         if await is_active_chat(chat_id):
@@ -301,8 +327,13 @@ async def stream(
         else:
             if chat_id not in db:
                 db[chat_id] = []
-                
-            await StreamController.join_call(chat_id, original_chat_id, file_path, video=False)
+            
+            try:
+                await StreamController.join_call(chat_id, original_chat_id, file_path, video=False)
+            except Exception as e:
+                LOGGER(__name__).error(f"❌ SoundCloud Join Call Error: {e}")
+                raise AssistantErr(_["call_8"])
+
             await put_queue(
                 chat_id,
                 original_chat_id,
@@ -338,7 +369,7 @@ async def stream(
         title = (result["title"]).title()
         duration_min = result["dur"]
         if not file_path:
-            # ⚠️ شلنا الحذف
+            LOGGER(__name__).error("❌ Telegram File Path missing.")
             raise AssistantErr(_["play_14"])
 
         if await is_active_chat(chat_id):
@@ -365,7 +396,12 @@ async def stream(
             if chat_id not in db:
                 db[chat_id] = []
                 
-            await StreamController.join_call(chat_id, original_chat_id, file_path, video=is_video)
+            try:
+                await StreamController.join_call(chat_id, original_chat_id, file_path, video=is_video)
+            except Exception as e:
+                LOGGER(__name__).error(f"❌ Telegram File Join Call Error: {e}")
+                raise AssistantErr(_["call_8"])
+
             await put_queue(
                 chat_id,
                 original_chat_id,
@@ -425,22 +461,28 @@ async def stream(
         else:
             if chat_id not in db:
                 db[chat_id] = []
-                
-            n, file_path = await YouTube.video(link)
-            if n == 0:
-                # ⚠️ شلنا الحذف
-                raise AssistantErr(_["str_3"])
-            if not file_path:
-                # ⚠️ شلنا الحذف
+            
+            try:
+                n, file_path = await YouTube.video(link)
+                if n == 0:
+                    LOGGER(__name__).error("❌ Live Stream: No formats found.")
+                    raise AssistantErr(_["str_3"])
+                if not file_path:
+                    LOGGER(__name__).error("❌ Live Stream: File Path missing.")
+                    raise AssistantErr(_["play_14"])
+
+                await StreamController.join_call(
+                    chat_id,
+                    original_chat_id,
+                    file_path,
+                    video=is_video,
+                    image=thumbnail or None,
+                )
+            except Exception as e:
+                LOGGER(__name__).error(f"❌ Live Stream Join/Fetch Error: {e}")
+                LOGGER(__name__).error(traceback.format_exc())
                 raise AssistantErr(_["play_14"])
 
-            await StreamController.join_call(
-                chat_id,
-                original_chat_id,
-                file_path,
-                video=is_video,
-                image=thumbnail or None,
-            )
             await put_queue(
                 chat_id,
                 original_chat_id,
@@ -499,13 +541,18 @@ async def stream(
         else:
             if chat_id not in db:
                 db[chat_id] = []
-                
-            await StreamController.join_call(
-                chat_id,
-                original_chat_id,
-                link,
-                video=is_video,
-            )
+            
+            try:
+                await StreamController.join_call(
+                    chat_id,
+                    original_chat_id,
+                    link,
+                    video=is_video,
+                )
+            except Exception as e:
+                LOGGER(__name__).error(f"❌ Index URL Join Error: {e}")
+                raise AssistantErr(_["call_8"])
+
             await put_queue_index(
                 chat_id,
                 original_chat_id,
