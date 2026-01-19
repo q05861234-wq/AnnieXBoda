@@ -1,12 +1,15 @@
 # Authored By Certified Coders © 2025
+# Merged & Optimized by TitanOS (Annie + Alexa + Anony + Brandrd)
+
 import asyncio
 import os
+import time
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Union, Dict
 
 from ntgcalls import TelegramServerError, ConnectionNotFound
 from pyrogram import Client
-from pyrogram.errors import FloodWait, ChatAdminRequired
+from pyrogram.errors import FloodWait, ChatAdminRequired, UserAlreadyParticipant
 from pyrogram.types import InlineKeyboardMarkup
 from pytgcalls import PyTgCalls
 from pytgcalls.exceptions import NoActiveGroupCall, NoAudioSourceFound, NoVideoSourceFound
@@ -46,26 +49,103 @@ from AnnieXMedia.utils.errors import capture_internal_err
 autoend = {}
 counter = {}
 
-# --- 🔥 TITANOS OPTIMIZATION: MULTI-CORE & BUFFERING ---
+# =======================================================================
+# 🗂️ SMART CACHE SYSTEM (Imported from Brandrd)
+# =======================================================================
+class SmartCache:
+    def __init__(self):
+        self.cache: Dict[str, Dict] = {}
+        self.ttl = 600  # 10 Minutes Cache
+
+    def get(self, video_id: str) -> str:
+        self.cleanup()
+        if video_id in self.cache:
+            entry = self.cache[video_id]
+            if time.time() - entry['timestamp'] < self.ttl:
+                if os.path.exists(entry['path']):
+                    LOGGER(__name__).info(f"🚀 Cache Hit: {video_id}")
+                    return entry['path']
+        return None
+
+    def store(self, video_id: str, path: str):
+        self.cache[video_id] = {
+            'path': os.path.abspath(path),
+            'timestamp': time.time()
+        }
+
+    def cleanup(self):
+        now = time.time()
+        to_remove = []
+        for vid, entry in self.cache.items():
+            if now - entry['timestamp'] > self.ttl:
+                to_remove.append(vid)
+                # We don't delete the file, just remove from memory mapping
+                # to let system handle file cleanup or keep it for OS cache
+        for vid in to_remove:
+            del self.cache[vid]
+
+music_cache = SmartCache()
+
+# =======================================================================
+# 🔥 TITANOS V3: HYBRID ENGINE (Alexa Quality + Anony Speed)
+# =======================================================================
 def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = None) -> MediaStream:
-    # ⚡ Force FFmpeg to use Server Cores (Anti-Lag)
-    # -threads 8: Uses up to 8 CPU cores for encoding (FAST)
-    # -probesize 50M: Pre-loads 50MB of data to prevent buffering cuts
-    base_params = "-threads 8 -probesize 50M -analyzeduration 30M "
+    # 1. Advanced Core Detection
+    total_cores = os.cpu_count() or 1
+    usable_cores = max(1, total_cores - 1) if total_cores > 2 else total_cores
     
+    # 2. Logic Matrix (Adaptive Bitrate & Preset)
+    if total_cores <= 2:
+        # 🔻 LOW END (1-2 Cores) -> Fast Start
+        threads = str(usable_cores)
+        preset = "ultrafast" 
+        probe = "6M"         
+        analyze = "3M"
+        crf = "30"
+    elif total_cores <= 4:
+        # 🔸 MID RANGE (3-4 Cores) -> Balanced
+        threads = str(usable_cores)
+        preset = "veryfast"
+        probe = "15M"
+        analyze = "10M"
+        crf = "26"
+    else:
+        # 🟢 HIGH END (8-16 Cores) -> Cinematic Quality
+        threads = str(min(usable_cores, 16)) 
+        preset = "fast"      
+        probe = "50M"        
+        analyze = "25M"
+        crf = "23"           
+
+    # 3. Construct The Ultimate Command
+    base_params = (
+        f"-threads {threads} "
+        f"-preset {preset} "
+        f"-probesize {probe} "
+        f"-analyzeduration {analyze} "
+        "-nostdin -fflags nobuffer -flags low_delay "
+    )
+    
+    if video:
+        base_params += f"-crf {crf} "
+
     if ffmpeg_params:
         ffmpeg_params = base_params + ffmpeg_params
     else:
         ffmpeg_params = base_params
 
+    # Ensure absolute path for local files
+    if not path.startswith("http"):
+        path = os.path.abspath(path)
+
     if video:
         return MediaStream(
             media_path=path,
-            audio_parameters=AudioQuality.STUDIO, # Uses our modified 48k params
-            video_parameters=VideoQuality.HD_720p, # Uses our modified HD params
+            audio_parameters=AudioQuality.STUDIO, # Alexa's High Quality
+            video_parameters=VideoQuality.HD_720p,
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.REQUIRED,
-            ffmpeg_parameters=ffmpeg_params, # 🔥 INJECTED POWER
+            ffmpeg_parameters=ffmpeg_params,
         )
     else:
         return MediaStream(
@@ -73,48 +153,41 @@ def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = No
             audio_parameters=AudioQuality.STUDIO,
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.IGNORE,
-            ffmpeg_parameters=ffmpeg_params, # 🔥 INJECTED POWER
+            ffmpeg_parameters=ffmpeg_params,
         )
 
 async def _clear_(chat_id: int) -> None:
-    popped = db.pop(chat_id, None)
-    if popped:
-        await auto_clean(popped)
-    db[chat_id] = []
-    await remove_active_video_chat(chat_id)
-    await remove_active_chat(chat_id)
-    await set_loop(chat_id, 0)
+    try:
+        if popped := db.pop(chat_id, None):
+            await auto_clean(popped)
+        await remove_active_video_chat(chat_id)
+        await remove_active_chat(chat_id)
+        await set_loop(chat_id, 0)
+    except:
+        pass
 
 class Call:
     def __init__(self):
-        # 🔥 TitanOS: Increased Cache Duration to 200s for stability on 16-Core Server
-        self.userbot1 = Client(
-            "AnnieXAssis1", config.API_ID, config.API_HASH, session_string=config.STRING1
-        ) if config.STRING1 else None
-        self.one = PyTgCalls(self.userbot1, cache_duration=200) if self.userbot1 else None
+        # 🔥 Smart Cache Duration logic
+        cores = os.cpu_count() or 1
+        smart_cache = 100 if cores <= 4 else 200
 
-        self.userbot2 = Client(
-            "AnnieXAssis2", config.API_ID, config.API_HASH, session_string=config.STRING2
-        ) if config.STRING2 else None
-        self.two = PyTgCalls(self.userbot2, cache_duration=200) if self.userbot2 else None
+        self.userbot1 = Client("AnnieXAssis1", config.API_ID, config.API_HASH, session_string=config.STRING1) if config.STRING1 else None
+        self.one = PyTgCalls(self.userbot1, cache_duration=smart_cache) if self.userbot1 else None
 
-        self.userbot3 = Client(
-            "AnnieXAssis3", config.API_ID, config.API_HASH, session_string=config.STRING3
-        ) if config.STRING3 else None
-        self.three = PyTgCalls(self.userbot3, cache_duration=200) if self.userbot3 else None
+        self.userbot2 = Client("AnnieXAssis2", config.API_ID, config.API_HASH, session_string=config.STRING2) if config.STRING2 else None
+        self.two = PyTgCalls(self.userbot2, cache_duration=smart_cache) if self.userbot2 else None
 
-        self.userbot4 = Client(
-            "AnnieXAssis4", config.API_ID, config.API_HASH, session_string=config.STRING4
-        ) if config.STRING4 else None
-        self.four = PyTgCalls(self.userbot4, cache_duration=200) if self.userbot4 else None
+        self.userbot3 = Client("AnnieXAssis3", config.API_ID, config.API_HASH, session_string=config.STRING3) if config.STRING3 else None
+        self.three = PyTgCalls(self.userbot3, cache_duration=smart_cache) if self.userbot3 else None
 
-        self.userbot5 = Client(
-            "AnnieXAssis5", config.API_ID, config.API_HASH, session_string=config.STRING5
-        ) if config.STRING5 else None
-        self.five = PyTgCalls(self.userbot5, cache_duration=200) if self.userbot5 else None
+        self.userbot4 = Client("AnnieXAssis4", config.API_ID, config.API_HASH, session_string=config.STRING4) if config.STRING4 else None
+        self.four = PyTgCalls(self.userbot4, cache_duration=smart_cache) if self.userbot4 else None
+
+        self.userbot5 = Client("AnnieXAssis5", config.API_ID, config.API_HASH, session_string=config.STRING5) if config.STRING5 else None
+        self.five = PyTgCalls(self.userbot5, cache_duration=smart_cache) if self.userbot5 else None
 
         self.active_calls: set[int] = set()
-        self.turbo_mode = {} 
 
     @capture_internal_err
     async def pause_stream(self, chat_id: int) -> None:
@@ -205,10 +278,13 @@ class Call:
         os.makedirs(chatdir, exist_ok=True)
         out = os.path.join(chatdir, base)
 
+        # Smart Speedup Processing - Multi Threaded
+        cores = os.cpu_count() or 1
+        speed_threads = str(max(1, cores - 1)) 
+        
         if not os.path.exists(out):
-            # 🔥 TitanOS: Use multi-threads for speedup processing too
             vs = str(2.0 / float(speed))
-            cmd = f'ffmpeg -threads 8 -i "{file_path}" -filter:v "setpts={vs}*PTS" -filter:a atempo={speed} -y "{out}"'
+            cmd = f'ffmpeg -threads {speed_threads} -i "{file_path}" -filter:v "setpts={vs}*PTS" -filter:a atempo={speed} -y "{out}"'
             proc = await asyncio.create_subprocess_shell(
                 cmd,
                 stdin=asyncio.subprocess.PIPE,
@@ -261,8 +337,13 @@ class Call:
         assistant = await group_assistant(self, chat_id)
         lang = await get_lang(chat_id)
         _ = get_string(lang)
-        stream = dynamic_media_stream(path=link, video=bool(video))
         ksk = GroupCallConfig(auto_start=False)
+        
+        # Determine path (Use absolute for local)
+        if not link.startswith("http"):
+            link = os.path.abspath(link)
+
+        stream = dynamic_media_stream(path=link, video=bool(video))
 
         try:
             await assistant.play(chat_id, stream, config=ksk)
@@ -346,6 +427,11 @@ class Call:
 
             video = True if str(streamtype) == "video" else False
             
+            # --- CACHE CHECK (Brandrd Feature) ---
+            cached_path = music_cache.get(videoid)
+            if cached_path and "vid_" in queued:
+                queued = cached_path
+            
             if "live_" in queued:
                 n, link = await YouTube.video(videoid, True)
                 if n == 0:
@@ -375,15 +461,21 @@ class Call:
 
             elif "vid_" in queued:
                 mystic = await app.send_message(original_chat_id, _["call_7"])
-                try:
-                    file_path, direct = await YouTube.download(
-                        videoid,
-                        mystic,
-                        videoid=True,
-                        video=video,
-                    )
-                except:
-                    return await mystic.edit_text(_["call_6"], disable_web_page_preview=True)
+                
+                if not cached_path:
+                    try:
+                        file_path, direct = await YouTube.download(
+                            videoid,
+                            mystic,
+                            videoid=True,
+                            video=video,
+                        )
+                        # Store in cache
+                        music_cache.store(videoid, file_path)
+                    except:
+                        return await mystic.edit_text(_["call_6"], disable_web_page_preview=True)
+                else:
+                    file_path = cached_path
 
                 stream = dynamic_media_stream(path=file_path, video=video)
                 try:
