@@ -5,8 +5,10 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
-# تفعيل خيارات السرعة القصوى لـ Aria2
-ENV ARIA2_OPTS="--max-connection-per-server=16 --split=16 --min-split-size=1M --buffer-size=64M"
+
+# 🔥 إعدادات السرعة القصوى تُفرض على النظام بالكامل 🔥
+# ده بيخلي أي عملية تحميل تاخد 16 خط وتستخدم الرامات بدل الهارد
+ENV ARIA2_OPTS="--max-connection-per-server=16 --split=16 --min-split-size=1M --disk-cache=256M"
 
 WORKDIR /app
 
@@ -17,7 +19,7 @@ RUN rm -rf /app/*
 # 1. تجهيز أدوات البناء وتجميع Aria2 من المصدر
 # -------------------------------------------------------------
 RUN apt-get update && \
-    # ✅ تم إضافة gettext هنا عشان تحل مشكلة autopoint
+    # ✅ إضافة autopoint و gettext لحل مشكلة البناء السابقة
     apt-get install -y --no-install-recommends \
     git \
     ffmpeg \
@@ -29,6 +31,7 @@ RUN apt-get update && \
     libtool \
     pkg-config \
     gettext \
+    autopoint \
     libxml2-dev \
     libcppunit-dev \
     libgcrypt-dev \
@@ -38,7 +41,7 @@ RUN apt-get update && \
     libssh2-1-dev \
     libssl-dev && \
     \
-    # ⬇️ بناء Aria2 من السورس كود ⬇️
+    # ⬇️ بناء Aria2 من السورس كود (أحدث نسخة) ⬇️
     echo "Building latest Aria2 from Source..." && \
     git clone https://github.com/aria2/aria2.git && \
     cd aria2 && \
@@ -48,6 +51,17 @@ RUN apt-get update && \
     make install && \
     cd .. && \
     rm -rf aria2 && \
+    \
+    # ⚡ إنشاء ملف إعدادات "Turbo" دائم للنظام ⚡
+    # الإعدادات دي بتشتغل أوتوماتيك مع أي تحميل
+    mkdir -p /root/.aria2 && \
+    echo "max-connection-per-server=16" > /root/.aria2/aria2.conf && \
+    echo "split=16" >> /root/.aria2/aria2.conf && \
+    echo "min-split-size=1M" >> /root/.aria2/aria2.conf && \
+    echo "disk-cache=256M" >> /root/.aria2/aria2.conf && \
+    echo "file-allocation=none" >> /root/.aria2/aria2.conf && \
+    echo "continue=true" >> /root/.aria2/aria2.conf && \
+    echo "optimize-concurrent-downloads=true" >> /root/.aria2/aria2.conf && \
     \
     # تثبيت Deno
     curl -fsSL https://deno.land/install.sh | sh && \
@@ -64,12 +78,12 @@ COPY pytgcalls /app/pytgcalls
 
 COPY requirements.txt /app/requirements.txt
 
-# فلترة المتطلبات
+# فلترة المتطلبات (حذف py-tgcalls عشان نستخدم المحلي)
 RUN if [ -f /app/requirements.txt ]; then \
       grep -v -i '^py-tgcalls' /app/requirements.txt > /app/filtered-requirements.txt || true; \
     fi
 
-# تثبيت المكتبات
+# تثبيت المكتبات + uvloop للسرعة
 RUN pip install --upgrade pip setuptools wheel && \
     pip install uvloop && \
     if [ -f /app/filtered-requirements.txt ]; then pip install --no-cache-dir -r /app/filtered-requirements.txt; fi
