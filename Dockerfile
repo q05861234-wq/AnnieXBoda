@@ -1,5 +1,5 @@
 # Python 3.12 معتمدة على نسخة pytgcalls المحلية
-FROM python:3.12-slim
+FROM python:3.12
 
 # تحسينات الأداء والبيئة
 ENV PYTHONDONTWRITEBYTECODE=1
