@@ -1,9 +1,8 @@
 # Authored By Certified Coders © 2025
-# Optimized by TitanOS (Auto-Scaling CPU Detection + Stereo + Anti-Stutter)
+# Optimized by TitanOS (Direct FFMPEG Injection + Auto-Scaling + Stereo Force)
 
 import asyncio
 import os
-import multiprocessing
 from datetime import datetime, timedelta
 from typing import Union
 
@@ -49,27 +48,27 @@ from AnnieXMedia.utils.errors import capture_internal_err
 autoend = {}
 counter = {}
 
-# --- 🔥 TitanOS Engine: Auto-Detect CPU Cores ---
+# --- 🔥 TitanOS Logic: Auto-Detect Hardware ---
 try:
-    # الطريقة الدقيقة لسيرفرات اللينكس (Docker/Fly.io)
-    # بتجيب الكورات المسموح بيها للكونتينر بس، مش السيرفر كله
+    # بيحاول يجيب الكورات المسموح بيها للعملية (الأدق للسيرفرات)
     TITAN_CORES = len(os.sched_getaffinity(0))
 except AttributeError:
-    # لو ويندوز أو نظام تاني، هات عدد الكورات الكلي
+    # لو فشل (ويندوز مثلاً) بيجيب عدد الكورات الكلي
     TITAN_CORES = os.cpu_count() or 2
 
-# رسالة تأكيد في اللوج عشان تعرف هو سحب كام كور
-LOGGER(__name__).info(f"✅ TitanOS Engine Detected: {TITAN_CORES} CPU Cores. Optimizing FFMPEG...")
+LOGGER(__name__).info(f"✅ TitanOS Engine Initialized: Utilizing {TITAN_CORES} CPU Cores for FFMPEG.")
+
+# --- 🔥 FFMPEG Raw Injection Strings ---
+# هنا بنبني أوامر FFMPEG اللي هتتفرض على المكتبة فرضاً
+# -threads: السرعة
+# -ac 2: ستيريو
+# -ar 48000: نقاء الصوت
+# -probesize/-analyzeduration: المخزن (Buffer) لمنع التقطيع
+TITAN_FLAGS = f"-threads {TITAN_CORES} -ac 2 -ar 48000 -probesize 100M -analyzeduration 100M -preset ultrafast"
 
 def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = None) -> MediaStream:
-    # ⚙️ إعدادات الوحش الديناميكية:
-    # -threads {TITAN_CORES}: بيحط الرقم اللي اكتشفه فوق أوتوماتيك.
-    # -ac 2: إجبار الصوت على وضع Stereo.
-    # -probesize 50M: لمنع التقطيع.
-    
-    titan_flags = f"-threads {TITAN_CORES} -ac 2 -probesize 50M -analyzeduration 50M -preset ultrafast"
-    
-    final_params = f"{titan_flags} {ffmpeg_params}" if ffmpeg_params else titan_flags
+    # دمج الفلاجز الأساسية مع أي فلاجز إضافية (زي التقديم والتأخير)
+    final_params = f"{TITAN_FLAGS} {ffmpeg_params}" if ffmpeg_params else TITAN_FLAGS
 
     if video:
         return MediaStream(
@@ -78,7 +77,7 @@ def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = No
             video_parameters=VideoQuality.HD_720p,
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.REQUIRED,
-            ffmpeg_parameters=final_params,
+            ffmpeg_parameters=final_params, # 💉 الحقن المباشر
         )
     else:
         return MediaStream(
@@ -86,7 +85,7 @@ def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = No
             audio_parameters=AudioQuality.STUDIO,
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.IGNORE,
-            ffmpeg_parameters=final_params,
+            ffmpeg_parameters=final_params, # 💉 الحقن المباشر
         )
 
 async def _clear_(chat_id: int) -> None:
@@ -100,7 +99,7 @@ async def _clear_(chat_id: int) -> None:
 
 class Call:
     def __init__(self):
-        # زيادة الكاش لضمان الاستقرار مع الرامات العالية
+        # Increased cache duration to prevent re-fetching on slight net glitches
         self.userbot1 = Client(
             "AnnieXAssis1", config.API_ID, config.API_HASH, session_string=config.STRING1
         ) if config.STRING1 else None
@@ -201,6 +200,7 @@ class Call:
     @capture_internal_err
     async def seek_stream(self, chat_id: int, file_path: str, to_seek: str, duration: str, mode: str) -> None:
         assistant = await group_assistant(self, chat_id)
+        # دمجنا فلاجز التيتان مع فلاجز التقديم
         ffmpeg_params = f"-ss {to_seek} -to {duration}"
         is_video = mode == "video"
         stream = dynamic_media_stream(path=file_path, video=is_video, ffmpeg_params=ffmpeg_params)
@@ -219,7 +219,7 @@ class Call:
 
         if not os.path.exists(out):
             vs = str(2.0 / float(speed))
-            # 🔥 استخدام عدد الكورات الديناميكي في التسريع كمان
+            # 🔥 حتى في عملية التحويل، بنستخدم كل الكورات
             cmd = f'ffmpeg -threads {TITAN_CORES} -i "{file_path}" -filter:v "setpts={vs}*PTS" -filter:a atempo={speed} -y "{out}"'
             proc = await asyncio.create_subprocess_shell(
                 cmd,
@@ -232,6 +232,8 @@ class Call:
         played, con_seconds = speed_converter(playing[0]["played"], speed)
         duration_min = seconds_to_min(dur)
         is_video = playing[0]["streamtype"] == "video"
+        
+        # بنضيف التيتان فلاجز هنا كمان
         ffmpeg_params = f"-ss {played} -to {duration_min}"
         stream = dynamic_media_stream(path=out, video=is_video, ffmpeg_params=ffmpeg_params)
 
@@ -253,7 +255,8 @@ class Call:
     async def stream_call(self, link: str) -> None:
         assistant = await group_assistant(self, config.LOGGER_ID)
         try:
-            await assistant.play(config.LOGGER_ID, MediaStream(link))
+            # هنا كمان بنستخدم الدالة المحسنة
+            await assistant.play(config.LOGGER_ID, dynamic_media_stream(link))
             await asyncio.sleep(8)
         finally:
             try:
@@ -273,6 +276,8 @@ class Call:
         assistant = await group_assistant(self, chat_id)
         lang = await get_lang(chat_id)
         _ = get_string(lang)
+        
+        # 🔥 الاعتماد الكلي على الدالة المحسنة
         stream = dynamic_media_stream(path=link, video=bool(video))
         ksk = GroupCallConfig(auto_start=False)
 
