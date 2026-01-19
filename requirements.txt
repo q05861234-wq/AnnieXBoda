@@ -1,4 +1,5 @@
 aiofiles
+psutil
 uvloop
 aria2
 aiohttp
