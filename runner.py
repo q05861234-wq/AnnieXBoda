@@ -1,146 +1,101 @@
-import os
-import sys
 import asyncio
-import signal
 import logging
-import threading
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-from datetime import datetime
-from pyrogram import idle  # مهم جداً للتشغيل المستمر
+import time
+import sys
+from pyrogram import idle
+from AnnieXMedia import app
 
 # =========================
-# إعدادات السجلات (LOGGING)
+# 1. تفعيل UVLoop (السرعة)
 # =========================
+try:
+    import uvloop
+    uvloop.install()
+    UVLOOP_STATE = "✅ مفعل (Active)"
+except ImportError:
+    UVLOOP_STATE = "⚠️ غير مثبت (Not Installed)"
 
-LOG_FORMAT = "[%(asctime)s] [%(levelname)s] %(message)s"
+# =========================
+# 2. إعدادات اللوجز
+# =========================
 logging.basicConfig(
     level=logging.INFO,
-    format=LOG_FORMAT,
+    format="[%(asctime)s] %(message)s",
     datefmt="%H:%M:%S",
 )
-
-logger = logging.getLogger("UVLOOP-ENGINE")
-
-# =========================
-# تحسينات المعالج (CPU)
-# =========================
-
-CPU_CORES = os.cpu_count() or 4
-MAX_THREADS = min(32, CPU_CORES * 4)
-MAX_PROCESSES = max(2, CPU_CORES - 1)
-
-logger.info(f"⚙️ عدد أنوية المعالج المكتشفة: {CPU_CORES}")
-logger.info(f"🧵 حجم مجمع المسارات (Threads): {MAX_THREADS}")
-logger.info(f"⚡ حجم مجمع العمليات (Processes): {MAX_PROCESSES}")
-
-thread_pool = ThreadPoolExecutor(max_workers=MAX_THREADS)
-process_pool = ProcessPoolExecutor(max_workers=MAX_PROCESSES)
+logger = logging.getLogger("ServerState")
 
 # =========================
-# تفعيل UVLOOP
+# 3. مراقب السيرفر (كل 4 ساعات)
 # =========================
-
-def activate_uvloop():
-    try:
-        import uvloop
-        uvloop.install()
-        logger.info("🚀 تم تفعيل UVLoop بنجاح")
-    except Exception as e:
-        logger.warning(f"⚠️ فشل تفعيل UVLoop: {e}")
-
-activate_uvloop()
-
-# =========================
-# ضبط النظام (SYSTEM TUNING)
-# =========================
-
-os.environ.setdefault("PYTHONASYNCIODEBUG", "0")
-os.environ.setdefault("PYTHONUNBUFFERED", "1")
-
-# =========================
-# مراقب الأداء (PERFORMANCE MONITOR)
-# =========================
-
-class PerformanceMonitor:
-    def __init__(self):
-        self.start_time = datetime.now()
-
-    async def monitor(self):
-        while True:
-            await asyncio.sleep(10)
+async def server_status_monitor():
+    start_time = time.time()
+    
+    while True:
+        try:
+            # حساب وقت التشغيل بالساعات
+            uptime_seconds = int(time.time() - start_time)
+            uptime_hours = uptime_seconds // 3600
+            uptime_minutes = (uptime_seconds % 3600) // 60
+            
+            # محاولة جلب معلومات الرام والمعالج
+            status_report = f"⏱️ وقت التشغيل: {uptime_hours} ساعة و {uptime_minutes} دقيقة"
+            
             try:
-                loop = asyncio.get_running_loop()
-                uptime = (datetime.now() - self.start_time).seconds
-                pending = len(asyncio.all_tasks(loop))
+                import psutil
+                cpu = psutil.cpu_percent()
+                ram = psutil.virtual_memory()
+                ram_used = ram.used // (1024 * 1024)
+                ram_total = ram.total // (1024 * 1024)
+                
+                status_report += f" | 🖥️ المعالج: {cpu}% | 💾 الرام: {ram_used}/{ram_total}MB ({ram.percent}%)"
+            except ImportError:
+                status_report += " | (psutil غير مثبت لعرض الموارد)"
 
-                logger.info(
-                    f"📊 وقت التشغيل: {uptime}ث | المهام المعلقة: {pending} | "
-                    f"المسارات النشطة: {threading.active_count()} | "
-                    f"الأنوية: {CPU_CORES}"
-                )
-            except:
-                pass
+            status_report += f" | 🚀 المحرك: {UVLOOP_STATE}"
+            
+            # طباعة الحالة
+            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            logger.info(status_report)
+            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            
+            # الانتظار لمدة 4 ساعات (4 * 60 * 60 = 14400 ثانية)
+            await asyncio.sleep(14400)
+            
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"⚠️ خطأ في المراقب: {e}")
+            await asyncio.sleep(60)
 
 # =========================
-# تحميل البوت (BOT LOADER)
+# 4. المحرك الرئيسي
 # =========================
+async def main():
+    logger.info("🔥 بدء تشغيل النظام...")
+    
+    # تشغيل مراقب السيرفر في الخلفية
+    monitor_task = asyncio.create_task(server_status_monitor())
 
-def load_bot():
+    # تشغيل البوت
     try:
-        from AnnieXMedia import app
-        return app
+        await app.start()
+        logger.info(f"✅ تم تشغيل البوت بنجاح: @{app.me.username}")
     except Exception as e:
-        logger.exception("❌ فشل تحميل البوت")
+        logger.error(f"❌ فشل تشغيل البوت: {e}")
         sys.exit(1)
 
-# =========================
-# المحرك الرئيسي (MAIN ENGINE)
-# =========================
-
-async def main():
-    logger.info("🔥 بدء تشغيل المحرك عالي الأداء...")
-
-    # تشغيل مراقب الأداء
-    monitor = PerformanceMonitor()
-    asyncio.create_task(monitor.monitor())
-
-    # تحميل البوت
-    app = load_bot()
-
-    logger.info("🚀 جاري الاتصال بسيرفرات تليجرام...")
-
-    # --- بداية التشغيل الصحيح ---
-    try:
-        # بنشغل البوت مباشرة هنا عشان يستفيد من سرعة UVLoop
-        await app.start()
-    except Exception as e:
-        logger.error(f"⚠️ حدث خطأ أثناء الاتصال: {e}")
-        # لو الخطأ بسيط كمل، لو كبير هيقفل لوحده
-
-    # تفعيل وضع الخمول عشان البوت يفضل شغال وميقفلش
+    # تثبيت التشغيل
+    logger.info("🟢 النظام يعمل باستقرار. سيتم تحديث الحالة كل 4 ساعات.")
     await idle()
-    
-    # --- نهاية التشغيل ---
 
-    logger.warning("🛑 جاري إغلاق البوت...")
-    try:
-        await app.stop()
-    except:
-        pass
-
-    logger.warning("🧹 تنظيف الموارد...")
-    thread_pool.shutdown(wait=False)
-    process_pool.shutdown(wait=False)
-
-# =========================
-# نقطة الدخول (ENTRY POINT)
-# =========================
+    # الإغلاق
+    logger.info("🛑 جاري إيقاف الخدمات...")
+    monitor_task.cancel()
+    await app.stop()
 
 if __name__ == "__main__":
     try:
-        # تشغيل الـ Loop الرئيسي
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.warning("♥️  تم الإغلاق بواسطة (Boda)")
-    except Exception as e:
-        logger.error(f"❌ خطأ غير متوقع: {e}")
+        pass
