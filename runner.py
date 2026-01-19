@@ -2,97 +2,96 @@ import asyncio
 import logging
 import time
 import sys
-from pyrogram import idle
-from AnnieXMedia import app
 
-# =========================
-# 1. تفعيل UVLoop (السرعة)
-# =========================
+# ==========================================
+# 1. تفعيل UVLoop (أول خطوة إجبارياً)
+# ==========================================
+# لازم ده يحصل قبل أي import للبوت عشان نمنع مشكلة "Different Loop"
 try:
     import uvloop
     uvloop.install()
-    UVLOOP_STATE = "✅ مفعل (Active)"
+    LOOP_STATUS = "✅ UVLoop نشط"
 except ImportError:
-    UVLOOP_STATE = "⚠️ غير مثبت (Not Installed)"
+    LOOP_STATUS = "⚠️ Default Loop"
 
-# =========================
-# 2. إعدادات اللوجز
-# =========================
+# ==========================================
+# 2. استدعاء البوت (الآن آمن)
+# ==========================================
+from pyrogram import idle
+# استدعاء البوت هنا بعد تفعيل الـ Loop عشان يشتغل عليه
+from AnnieXMedia import app 
+
+# ==========================================
+# 3. إعدادات اللوجز
+# ==========================================
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("ServerState")
+logger = logging.getLogger("SystemMonitor")
 
-# =========================
-# 3. مراقب السيرفر (كل 4 ساعات)
-# =========================
-async def server_status_monitor():
+# ==========================================
+# 4. مراقب السيرفر (كل 4 ساعات)
+# ==========================================
+async def server_status_worker():
     start_time = time.time()
-    
     while True:
         try:
-            # حساب وقت التشغيل بالساعات
+            # حساب الوقت
             uptime_seconds = int(time.time() - start_time)
-            uptime_hours = uptime_seconds // 3600
-            uptime_minutes = (uptime_seconds % 3600) // 60
+            hours = uptime_seconds // 3600
+            minutes = (uptime_seconds % 3600) // 60
             
-            # محاولة جلب معلومات الرام والمعالج
-            status_report = f"⏱️ وقت التشغيل: {uptime_hours} ساعة و {uptime_minutes} دقيقة"
-            
+            # جلب المعلومات (لو متاحة)
+            usage_info = ""
             try:
                 import psutil
                 cpu = psutil.cpu_percent()
                 ram = psutil.virtual_memory()
-                ram_used = ram.used // (1024 * 1024)
-                ram_total = ram.total // (1024 * 1024)
-                
-                status_report += f" | 🖥️ المعالج: {cpu}% | 💾 الرام: {ram_used}/{ram_total}MB ({ram.percent}%)"
-            except ImportError:
-                status_report += " | (psutil غير مثبت لعرض الموارد)"
+                usage_info = f"| 🖥️ CPU: {cpu}% | 💾 RAM: {ram.percent}%"
+            except:
+                pass
 
-            status_report += f" | 🚀 المحرك: {UVLOOP_STATE}"
+            # طباعة الحالة في سطر واحد نظيف
+            logger.info(
+                f"📊 الحالة: مستقر {usage_info} | ⏱️ العمل: {hours}س و {minutes}د | 🚀 {LOOP_STATUS}"
+            )
             
-            # طباعة الحالة
-            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            logger.info(status_report)
-            logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            
-            # الانتظار لمدة 4 ساعات (4 * 60 * 60 = 14400 ثانية)
+            # النوم لمدة 4 ساعات
             await asyncio.sleep(14400)
             
         except asyncio.CancelledError:
             break
-        except Exception as e:
-            logger.error(f"⚠️ خطأ في المراقب: {e}")
+        except Exception:
             await asyncio.sleep(60)
 
-# =========================
-# 4. المحرك الرئيسي
-# =========================
+# ==========================================
+# 5. التشغيل الرئيسي
+# ==========================================
 async def main():
-    logger.info("🔥 بدء تشغيل النظام...")
-    
-    # تشغيل مراقب السيرفر في الخلفية
-    monitor_task = asyncio.create_task(server_status_monitor())
+    logger.info("🔥 بدء إقلاع النظام...")
 
-    # تشغيل البوت
+    # تشغيل المراقب في الخلفية (Task منفصلة لا تعطل البوت)
+    asyncio.create_task(server_status_worker())
+
+    # تشغيل البوت فقط (بدون التدخل في المساعد)
     try:
         await app.start()
-        logger.info(f"✅ تم تشغيل البوت بنجاح: @{app.me.username}")
+        logger.info(f"✅ تم الاتصال: {app.me.first_name} (@{app.me.username})")
     except Exception as e:
-        logger.error(f"❌ فشل تشغيل البوت: {e}")
-        sys.exit(1)
+        logger.error(f"❌ فشل الاتصال: {e}")
+        return
 
     # تثبيت التشغيل
-    logger.info("🟢 النظام يعمل باستقرار. سيتم تحديث الحالة كل 4 ساعات.")
+    logger.info("⚡ النظام يعمل الآن. (Ctrl+C للإيقاف)")
     await idle()
 
     # الإغلاق
-    logger.info("🛑 جاري إيقاف الخدمات...")
-    monitor_task.cancel()
-    await app.stop()
+    try:
+        await app.stop()
+    except:
+        pass
 
 if __name__ == "__main__":
     try:
