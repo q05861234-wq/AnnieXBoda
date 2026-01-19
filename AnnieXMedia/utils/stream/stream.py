@@ -1,5 +1,5 @@
 # Authored By Certified Coders © 2025
-# Optimized by TitanOS (Annie Base + Alexa Style + Brandrd Safety)
+# Optimized by TitanOS (MessageIdInvalid Fix)
 
 import os
 import asyncio
@@ -22,7 +22,7 @@ from AnnieXMedia.utils.thumbnails import get_thumb
 from AnnieXMedia.utils.errors import capture_internal_err
 
 
-# --- 🛡️ إضافة دالة الحذف الآمن (من Brandrd) ---
+# --- 🛡️ دالة الحذف الآمن ---
 async def safe_delete(message):
     try:
         await message.delete()
@@ -50,7 +50,6 @@ async def stream(
     forceplay = bool(forceplay)
     is_video = bool(video)
 
-    # إيقاف التشغيل الإجباري إذا تم طلبه
     if forceplay:
         await StreamController.force_stop_stream(chat_id)
 
@@ -94,7 +93,6 @@ async def stream(
                 msg += f"{count}. {title[:70]}\n"
                 msg += f"{_['play_20']} {position}\n\n"
             else:
-                # 🔥 إصلاح خطأ الـ KeyError (تأكد من وجود القائمة)
                 if chat_id not in db:
                     db[chat_id] = []
                 
@@ -128,7 +126,6 @@ async def stream(
                 img = await get_thumb(vidid)
                 button = stream_markup(_, chat_id)
                 
-                # حماية ضد FloodWait وتنسيق أليكسا
                 try:
                     run = await app.send_photo(
                         original_chat_id,
@@ -185,11 +182,11 @@ async def stream(
                 vidid, mystic, video=is_video, videoid=vidid
             )
         except Exception:
-            await safe_delete(mystic)
+            # ⚠️ شلنا الحذف من هنا عشان ملف play.py يعرف يعرض الخطأ
             raise AssistantErr(_["play_14"])
         
         if not file_path:
-            await safe_delete(mystic)
+            # ⚠️ وهنا كمان
             raise AssistantErr(_["play_14"])
 
         if await is_active_chat(chat_id):
@@ -213,7 +210,6 @@ async def stream(
                 reply_markup=InlineKeyboardMarkup(button),
             )
         else:
-            # 🔥 الحل الجذري لمشكلة الـ KeyError
             if chat_id not in db:
                 db[chat_id] = []
                 
@@ -239,7 +235,7 @@ async def stream(
             
             img = await get_thumb(vidid)
             button = stream_markup(_, chat_id)
-            await safe_delete(mystic)
+            await safe_delete(mystic) # هنا نحذف عادي لأننا هنبعت الصورة بنجاح
             
             try:
                 run = await app.send_photo(
@@ -279,7 +275,7 @@ async def stream(
         title = result["title"]
         duration_min = result["duration_min"]
         if not file_path:
-            await safe_delete(mystic)
+            # ⚠️ شلنا الحذف
             raise AssistantErr(_["play_14"])
 
         if await is_active_chat(chat_id):
@@ -342,7 +338,7 @@ async def stream(
         title = (result["title"]).title()
         duration_min = result["dur"]
         if not file_path:
-            await safe_delete(mystic)
+            # ⚠️ شلنا الحذف
             raise AssistantErr(_["play_14"])
 
         if await is_active_chat(chat_id):
@@ -432,10 +428,10 @@ async def stream(
                 
             n, file_path = await YouTube.video(link)
             if n == 0:
-                await safe_delete(mystic)
+                # ⚠️ شلنا الحذف
                 raise AssistantErr(_["str_3"])
             if not file_path:
-                await safe_delete(mystic)
+                # ⚠️ شلنا الحذف
                 raise AssistantErr(_["play_14"])
 
             await StreamController.join_call(
