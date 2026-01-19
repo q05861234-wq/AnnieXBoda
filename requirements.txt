@@ -1,4 +1,6 @@
 aiofiles
+uvloop
+aria2
 aiohttp
 apscheduler
 asyncio
