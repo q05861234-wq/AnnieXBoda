@@ -1,4 +1,6 @@
 # Authored By Certified Coders © 2025
+# Modified for Extreme Speed & Aria2 Integration 🚀
+
 import asyncio
 import contextlib
 import glob
@@ -11,6 +13,7 @@ import aiohttp
 from aiohttp import TCPConnector
 from yt_dlp import YoutubeDL
 
+# تأكد من مسارات المجلدات عندك
 from AnnieXMedia.core.dir import CACHE_DIR, DOWNLOAD_DIR
 from AnnieXMedia.utils.cookie_handler import COOKIE_PATH as _COOKIES_FILE
 from AnnieXMedia.utils.tuning import CHUNK_SIZE, SEM
@@ -29,7 +32,7 @@ YOUTUBE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
 
 
 def log_download_source(title: str, source: str) -> None:
-    LOGGER.info(f"Track '{title}' - Downloaded by {source}")
+    LOGGER.info(f"Track '{title}' - Downloaded by {source} 🚀")
 
 
 def extract_video_id(link: str) -> str:
@@ -55,7 +58,7 @@ def get_cookie_file() -> Optional[str]:
     return None
 
 # ==========================================
-# تــعــديــل الــســرعــة (Aria2 Integrated)
+# تــعــديــل الــســرعــة (Aria2 + iOS Hack) 🏎️
 # ==========================================
 def get_ytdlp_base_opts() -> Dict[str, object]:
     opts = {
@@ -67,21 +70,32 @@ def get_ytdlp_base_opts() -> Dict[str, object]:
         "continuedl": True,
         "noprogress": True,
         "socket_timeout": 30,
-        "retries": 5,
-        "fragment_retries": 5,
+        "retries": 10,
+        "fragment_retries": 10,
         "cachedir": str(CACHE_DIR),
         "ignoreerrors": True,
-        "merge_output_format": "mp4",
         
-        # 🚀 تــفــعــيــل Aria2 هــنــا
+        # تحسينات الشبكة (Force IPv4 for stability)
+        "source_address": "0.0.0.0", 
+        
+        # 🍎 خدعة الأيفون لتخطي التقطيع والسرعة المحدودة
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "web_embedded"],
+                "player_skip": ["configs", "js"],
+            }
+        },
+
+        # 🚀 Aria2: The Nuclear Engine
         "external_downloader": "aria2c",
         "external_downloader_args": [
-            "-c",            # استكمال التحميل
-            "-j", "16",      # 16 ملف في نفس الوقت
-            "-x", "16",      # 16 اتصال لكل سيرفر
-            "-s", "16",      # تقسيم الملف 16 حتة
-            "-k", "1M",      # أقل حجم للتقسيم 1 ميجا
-            "--disk-cache=128M" # تخزين مؤقت في الرامات
+            "-c",               # استكمال التحميل لو قطع
+            "-j", "16",         # 16 تنزيل متوازي
+            "-x", "16",         # 16 اتصال لكل سيرفر
+            "-s", "16",         # تقسيم الملف 16 جزء
+            "-k", "1M",         # حجم الجزء
+            "--file-allocation=none", # تسريع الكتابة عالديسك
+            "--disk-cache=128M" # استخدام الرامات للتخزين المؤقت
         ]
     }
     if cookiefile := get_cookie_file():
@@ -107,6 +121,7 @@ async def get_http_session() -> aiohttp.ClientSession:
         if _session and not _session.closed:
             return _session
         timeout = aiohttp.ClientTimeout(total=600, sock_connect=20, sock_read=60)
+        # DNS Cache optimization
         connector = TCPConnector(limit=0, ttl_dns_cache=300, enable_cleanup_closed=True)
         _session = aiohttp.ClientSession(timeout=timeout, connector=connector)
         return _session
@@ -284,13 +299,18 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
             LOGGER.info(f"Track '{title}' - Served from cache")
         return cached
 
+    # --------------------------------------------------------
+    # إعــدادات الــجــودة للــســرعــة الــقــصــوى 🔥
+    # تــم اســتــخــدام bestaudio بــدل best عــشــان مــيــحــولــش
+    # --------------------------------------------------------
+
     if type == "audio":
         key = f"audio:{link}"
-
         async def run():
+            # استخدام opus/webm عشان ميحتاجش تحويل FFMPEG تقيل
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
-                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestaudio[ext=webm][acodec=opus]")
+                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestaudio/best")
                 )
             )
             api_task = asyncio.create_task(api_download_audio(link)) if USE_AUDIO_API else None
@@ -300,16 +320,15 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
             if result and title:
                 log_download_source(title, "yt-dlp")
             return result
-
         return await deduplicate_download(key, run)
 
     elif type == "video":
         key = f"video:{link}"
-
         async def run():
+            # جودة 720p كافية للبوت وأسرع بكتير في التحميل من 1080p
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
-                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "(bestvideo[height<=?720][width<=?1280][ext=mp4])+(bestaudio)")
+                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestvideo[height<=720]+bestaudio/best[height<=720]")
                 )
             )
             api_task = asyncio.create_task(api_download_video(link)) if USE_VIDEO_API else None
@@ -319,7 +338,6 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
             if result and title:
                 log_download_source(title, "yt-dlp")
             return result
-
         return await deduplicate_download(key, run)
 
     return None
