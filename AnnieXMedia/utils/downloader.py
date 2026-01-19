@@ -7,6 +7,7 @@ import glob
 import os
 import re
 import shutil
+import random
 from typing import Dict, Optional
 
 import aiofiles
@@ -30,7 +31,7 @@ _session: Optional[aiohttp.ClientSession] = None
 _session_lock = asyncio.Lock()
 YOUTUBE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
 
-# ✅ البحث عن Aria2 تلقائياً
+# Auto-detect Aria2 path
 ARIA2_PATH = shutil.which("aria2c") or "/usr/bin/aria2c"
 
 def log_download_source(title: str, source: str) -> None:
@@ -50,15 +51,26 @@ def extract_video_id(link: str) -> str:
     return ""
 
 def get_cookie_file() -> Optional[str]:
+    # Check main cookie file
     try:
         if _COOKIES_FILE and os.path.exists(_COOKIES_FILE) and os.path.getsize(_COOKIES_FILE) > 0:
             return _COOKIES_FILE
     except Exception:
         pass
+    
+    # Check cookies folder (Rotation Logic)
+    if os.path.exists("cookies"):
+        try:
+            files = [f for f in os.listdir("cookies") if f.endswith(".txt")]
+            if files:
+                return os.path.join("cookies", random.choice(files))
+        except Exception:
+            pass
+            
     return None
 
 # ==========================================
-# ⚡ إعدادات "أليكسا" مع محرك Aria2
+# Alexa Logic + Aria2 Configuration
 # ==========================================
 def get_ytdlp_base_opts() -> Dict[str, object]:
     opts = {
@@ -74,12 +86,12 @@ def get_ytdlp_base_opts() -> Dict[str, object]:
         "cachedir": str(CACHE_DIR),
         "ignoreerrors": True,
         
-        # 🟢 إعدادات السرعة من سورس Alexa
-        "geo_bypass": True,            # تخطي الحظر الجغرافي
-        "nocheckcertificate": True,    # عدم فحص شهادات الأمان (أسرع)
-        "source_address": "0.0.0.0",   # إجبار IPv4
+        # Network optimizations
+        "geo_bypass": True,            
+        "nocheckcertificate": True,    
+        "source_address": "0.0.0.0",   
 
-        # 📱 انتحال Android (أسرع Clients حالياً)
+        # Client Spoofing (Android)
         "extractor_args": {
             "youtube": {
                 "player_client": ["android", "web"],
@@ -87,17 +99,17 @@ def get_ytdlp_base_opts() -> Dict[str, object]:
             }
         },
 
-        # 🚀 Aria2 Turbo (مظبوط على الشعرة)
+        # Aria2 Engine Settings
         "external_downloader": ARIA2_PATH,
         "external_downloader_args": [
             "-c",
-            "-j", "8",          # 8 اتصالات (أسرع وأأمن من 16)
-            "-x", "8",
-            "-s", "8",
+            "-j", "16",
+            "-x", "16",
+            "-s", "16",
             "-k", "1M",
             "--min-split-size=1M",
             "--file-allocation=none",
-            "--buffer-size=16M", # ذاكرة مؤقتة للشبكة
+            "--buffer-size=32M",
         ]
     }
     if cookiefile := get_cookie_file():
@@ -303,11 +315,10 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
     if type == "audio":
         key = f"audio:{link}"
         async def run():
-            # 🔥 السر هنا: طلب m4a مباشرة زي كود Alexa
-            # ده بيلغي وقت التحويل نهائياً وبيخلي التحميل طيارة
+            # Fallback formats to avoid errors
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
-                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestaudio[ext=m4a]")
+                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestaudio[ext=m4a]/bestaudio/best")
                 )
             )
             api_task = asyncio.create_task(api_download_audio(link)) if USE_AUDIO_API else None
@@ -322,10 +333,10 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
     elif type == "video":
         key = f"video:{link}"
         async def run():
-            # تحديد الجودة بـ 720 زي Alexa عشان السرعة
+            # Fallback formats to avoid errors
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
-                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestvideo[height<=720]+bestaudio/best[height<=720]")
+                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestvideo[height<=720]+bestaudio/best[height<=720]/best")
                 )
             )
             api_task = asyncio.create_task(api_download_video(link)) if USE_VIDEO_API else None
