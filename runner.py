@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from datetime import datetime
 
 # =========================
-# LOGGING CONFIGURATION
+# إعدادات السجلات (LOGGING)
 # =========================
 
 LOG_FORMAT = "[%(asctime)s] [%(levelname)s] %(message)s"
@@ -22,42 +22,43 @@ logging.basicConfig(
 logger = logging.getLogger("UVLOOP-ENGINE")
 
 # =========================
-# CPU OPTIMIZATION
+# تحسينات المعالج (CPU)
 # =========================
 
 CPU_CORES = os.cpu_count() or 4
 MAX_THREADS = min(32, CPU_CORES * 4)
 MAX_PROCESSES = max(2, CPU_CORES - 1)
 
-logger.info(f"⚙️ CPU Cores Detected: {CPU_CORES}")
-logger.info(f"🧵 Thread Pool Size: {MAX_THREADS}")
-logger.info(f"⚡ Process Pool Size: {MAX_PROCESSES}")
+logger.info(f"⚙️ عدد أنوية المعالج المكتشفة: {CPU_CORES}")
+logger.info(f"🧵 حجم مجمع المسارات (Threads): {MAX_THREADS}")
+logger.info(f"⚡ حجم مجمع العمليات (Processes): {MAX_PROCESSES}")
 
 thread_pool = ThreadPoolExecutor(max_workers=MAX_THREADS)
 process_pool = ProcessPoolExecutor(max_workers=MAX_PROCESSES)
 
 # =========================
-# UVLOOP ACTIVATION
+# تفعيل UVLOOP
 # =========================
 
 def activate_uvloop():
     try:
         import uvloop
         uvloop.install()
-        logger.info("🚀 UVLoop successfully activated")
+        logger.info("🚀 تم تفعيل UVLoop بنجاح")
     except Exception as e:
-        logger.warning(f"⚠️ UVLoop activation failed: {e}")
+        logger.warning(f"⚠️ فشل تفعيل UVLoop: {e}")
 
 activate_uvloop()
 
 # =========================
-# ASYNCIO OPTIMIZATIONS
+# تحسينات ASYNCIO
 # =========================
 
-asyncio.get_event_loop_policy()
+# تم إزالة الاستدعاء المباشر هنا لتجنب الأخطاء في إصدارات بايثون الحديثة
+# asyncio.get_event_loop_policy() 
 
 # =========================
-# SYSTEM TUNING
+# ضبط النظام (SYSTEM TUNING)
 # =========================
 
 os.environ.setdefault("PYTHONASYNCIODEBUG", "0")
@@ -66,60 +67,58 @@ os.environ.setdefault("OMP_NUM_THREADS", str(CPU_CORES))
 os.environ.setdefault("MKL_NUM_THREADS", str(CPU_CORES))
 
 # =========================
-# PERFORMANCE MONITOR
+# مراقب الأداء (PERFORMANCE MONITOR)
 # =========================
 
 class PerformanceMonitor:
     def __init__(self):
-        self.loop = asyncio.get_event_loop()
+        # تم إزالة get_event_loop من هنا لأنها تسبب المشكلة
         self.start_time = datetime.now()
-        self.tasks_processed = 0
 
     async def monitor(self):
         while True:
             await asyncio.sleep(10)
+            loop = asyncio.get_running_loop() # الحصول على الـ Loop الحالي بأمان
             uptime = (datetime.now() - self.start_time).seconds
-            pending = len(asyncio.all_tasks(self.loop))
+            pending = len(asyncio.all_tasks(loop))
 
             logger.info(
-                f"📊 Uptime: {uptime}s | Pending Tasks: {pending} | "
-                f"Threads: {threading.active_count()} | "
-                f"CPU Cores: {CPU_CORES}"
+                f"📊 وقت التشغيل: {uptime}ث | المهام المعلقة: {pending} | "
+                f"المسارات النشطة: {threading.active_count()} | "
+                f"الأنوية: {CPU_CORES}"
             )
 
-monitor = PerformanceMonitor()
-
 # =========================
-# SAFE SHUTDOWN
+# الإغلاق الآمن (SAFE SHUTDOWN)
 # =========================
 
 shutdown_event = asyncio.Event()
 
 def handle_exit(sig, frame):
-    logger.warning(f"🛑 Signal received: {sig}. Shutting down safely...")
+    logger.warning(f"🛑 تم استلام إشارة: {sig}. جاري إغلاق النظام بأمان...")
     shutdown_event.set()
 
 signal.signal(signal.SIGINT, handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
 
 # =========================
-# BOT LOADER
+# تحميل البوت (BOT LOADER)
 # =========================
 
 def load_bot():
     """
-    Import bot ONLY after uvloop activation
-    Prevents asyncio conflicts
+    استيراد البوت فقط بعد تفعيل uvloop
+    لمنع تضارب asyncio
     """
     try:
-        from AnnieXMedia import app   # عدل المسار لو مختلف
+        from AnnieXMedia import app   # تأكد أن المسار صحيح
         return app
     except Exception as e:
-        logger.exception("❌ Failed to load bot")
+        logger.exception("❌ فشل تحميل البوت")
         sys.exit(1)
 
 # =========================
-# ASYNC TASK WRAPPER
+# مغلف المهام غير المتزامنة
 # =========================
 
 async def run_blocking(func, *args):
@@ -131,31 +130,34 @@ async def run_cpu_bound(func, *args):
     return await loop.run_in_executor(process_pool, func, *args)
 
 # =========================
-# MAIN ENGINE
+# المحرك الرئيسي (MAIN ENGINE)
 # =========================
 
 async def main():
-    logger.info("🔥 High Performance Engine Starting...")
+    logger.info("🔥 بدء تشغيل المحرك عالي الأداء...")
+
+    # تهيئة المراقب هنا داخل الـ Loop
+    monitor = PerformanceMonitor()
+    asyncio.create_task(monitor.monitor())
 
     app = load_bot()
 
-    asyncio.create_task(monitor.monitor())
-
+    # تشغيل البوت
     await run_blocking(app.run)
 
     await shutdown_event.wait()
 
-    logger.warning("🧹 Cleaning up resources...")
+    logger.warning("🧹 تنظيف الموارد...")
 
     thread_pool.shutdown(wait=False)
     process_pool.shutdown(wait=False)
 
 # =========================
-# ENTRY POINT
+# نقطة الدخول (ENTRY POINT)
 # =========================
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.warning("♥️  Boda")
+        logger.warning("♥️  تم الإغلاق بواسطة (Boda)")
