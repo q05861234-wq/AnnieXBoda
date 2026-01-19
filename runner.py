@@ -2,24 +2,22 @@ import asyncio
 import logging
 import time
 import sys
+import uvloop
 
 # ==========================================
-# 1. تفعيل UVLoop (أول خطوة إجبارياً)
+# 1. إجبار النظام على استخدام UVLoop يدوياً
 # ==========================================
-# لازم ده يحصل قبل أي import للبوت عشان نمنع مشكلة "Different Loop"
-try:
-    import uvloop
-    uvloop.install()
-    LOOP_STATUS = "✅ UVLoop نشط"
-except ImportError:
-    LOOP_STATUS = "⚠️ Default Loop"
+# بنعمل Loop جديد بـ uvloop
+uvloop.install()
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 # ==========================================
-# 2. استدعاء البوت (الآن آمن)
+# 2. استدعاء البوت (بعد تجهيز الـ Loop)
 # ==========================================
+# الترتيب هنا حياة أو موت: لازم الاستدعاء يتم بعد السطرين اللي فوق
+from AnnieXMedia import app
 from pyrogram import idle
-# استدعاء البوت هنا بعد تفعيل الـ Loop عشان يشتغل عليه
-from AnnieXMedia import app 
 
 # ==========================================
 # 3. إعدادات اللوجز
@@ -34,67 +32,64 @@ logger = logging.getLogger("SystemMonitor")
 # ==========================================
 # 4. مراقب السيرفر (كل 4 ساعات)
 # ==========================================
-async def server_status_worker():
-    start_time = time.time()
+async def server_monitor():
     while True:
         try:
-            # حساب الوقت
-            uptime_seconds = int(time.time() - start_time)
-            hours = uptime_seconds // 3600
-            minutes = (uptime_seconds % 3600) // 60
+            # انتظار 4 ساعات في البداية (عشان منزحمش اللوج أول ما يفتح)
+            # 4 * 60 * 60 = 14400 ثانية
+            await asyncio.sleep(14400)
             
-            # جلب المعلومات (لو متاحة)
-            usage_info = ""
+            # تقرير بسيط جداً عشان ميعلقش
+            report = f"📊 تقرير دوري: السيرفر يعمل باستقرار (UVLoop Active)"
             try:
                 import psutil
                 cpu = psutil.cpu_percent()
-                ram = psutil.virtual_memory()
-                usage_info = f"| 🖥️ CPU: {cpu}% | 💾 RAM: {ram.percent}%"
+                ram = psutil.virtual_memory().percent
+                report += f" | CPU: {cpu}% | RAM: {ram}%"
             except:
                 pass
-
-            # طباعة الحالة في سطر واحد نظيف
-            logger.info(
-                f"📊 الحالة: مستقر {usage_info} | ⏱️ العمل: {hours}س و {minutes}د | 🚀 {LOOP_STATUS}"
-            )
             
-            # النوم لمدة 4 ساعات
-            await asyncio.sleep(14400)
+            logger.info(report)
             
         except asyncio.CancelledError:
             break
         except Exception:
-            await asyncio.sleep(60)
+            pass
 
 # ==========================================
-# 5. التشغيل الرئيسي
+# 5. دالة التشغيل الرئيسية
 # ==========================================
 async def main():
-    logger.info("🔥 بدء إقلاع النظام...")
+    logger.info("🔥 بدء تشغيل النظام (Manual Loop Mode)...")
+    
+    # تشغيل المراقب كـ Task فرعية
+    loop.create_task(server_monitor())
 
-    # تشغيل المراقب في الخلفية (Task منفصلة لا تعطل البوت)
-    asyncio.create_task(server_status_worker())
-
-    # تشغيل البوت فقط (بدون التدخل في المساعد)
+    # تشغيل البوت
     try:
+        # هنا البوت هيشتغل على الـ Loop اللي احنا حددناه فوق
         await app.start()
-        logger.info(f"✅ تم الاتصال: {app.me.first_name} (@{app.me.username})")
+        logger.info(f"✅ تم الاتصال: {app.me.first_name}")
     except Exception as e:
-        logger.error(f"❌ فشل الاتصال: {e}")
+        logger.error(f"❌ خطأ: {e}")
         return
 
-    # تثبيت التشغيل
-    logger.info("⚡ النظام يعمل الآن. (Ctrl+C للإيقاف)")
+    # وضع الخمول
+    logger.info("⚡ النظام يعمل الآن باستقرار تام.")
     await idle()
 
     # الإغلاق
-    try:
-        await app.stop()
-    except:
-        pass
+    await app.stop()
 
+# ==========================================
+# 6. نقطة الدخول (بدون asyncio.run)
+# ==========================================
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        # بنشغل الـ Loop اللي كريتناه بنفسنا
+        # دي الطريقة الوحيدة لمنع خطأ "Different Loop"
+        loop.run_until_complete(main())
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        logger.error(f"Fatal Error: {e}")
