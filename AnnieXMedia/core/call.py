@@ -1,7 +1,6 @@
 # Authored By Certified Coders © 2025
 import asyncio
 import os
-import math
 from datetime import datetime, timedelta
 from typing import Union
 
@@ -47,48 +46,13 @@ from AnnieXMedia.utils.errors import capture_internal_err
 autoend = {}
 counter = {}
 
-# --- 🔥 TITANOS V2: EXTREME ADAPTIVE PERFORMANCE ---
+# --- 🔥 TITANOS OPTIMIZATION: MULTI-CORE & BUFFERING ---
 def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = None) -> MediaStream:
-    # 1. Advanced Core Detection
-    # We leave 1 core free for OS tasks to prevent freezing
-    total_cores = os.cpu_count() or 1
-    usable_cores = max(1, total_cores - 1) if total_cores > 2 else total_cores
+    # ⚡ Force FFmpeg to use Server Cores (Anti-Lag)
+    # -threads 8: Uses up to 8 CPU cores for encoding (FAST)
+    # -probesize 50M: Pre-loads 50MB of data to prevent buffering cuts
+    base_params = "-threads 8 -probesize 50M -analyzeduration 30M "
     
-    # 2. Logic Matrix
-    if total_cores <= 2:
-        # 🔻 LOW END (1-2 Cores) -> Focus on Speed & Stability
-        threads = str(usable_cores)
-        preset = "ultrafast" # Zero lag priority
-        probe = "6M"         # Small buffer for quick start
-        analyze = "3M"
-        crf = "30"           # Lower bitrate to save CPU
-    elif total_cores <= 4:
-        # 🔸 MID RANGE (3-4 Cores) -> Balanced
-        threads = str(usable_cores)
-        preset = "veryfast"
-        probe = "15M"
-        analyze = "10M"
-        crf = "26"
-    else:
-        # 🟢 HIGH END (8-16 Cores) -> Focus on Quality (Cinematic)
-        threads = str(min(usable_cores, 16)) 
-        preset = "fast"      # Better compression quality
-        probe = "50M"        # Massive buffer
-        analyze = "25M"
-        crf = "23"           # High quality visuals
-
-    # 3. Build The Ultimate Command
-    base_params = (
-        f"-threads {threads} "
-        f"-preset {preset} "
-        f"-probesize {probe} "
-        f"-analyzeduration {analyze} "
-    )
-    
-    # Add CRF for video quality control if video is enabled
-    if video:
-        base_params += f"-crf {crf} "
-
     if ffmpeg_params:
         ffmpeg_params = base_params + ffmpeg_params
     else:
@@ -97,11 +61,11 @@ def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = No
     if video:
         return MediaStream(
             media_path=path,
-            audio_parameters=AudioQuality.STUDIO, 
-            video_parameters=VideoQuality.HD_720p,
+            audio_parameters=AudioQuality.STUDIO, # Uses our modified 48k params
+            video_parameters=VideoQuality.HD_720p, # Uses our modified HD params
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.REQUIRED,
-            ffmpeg_parameters=ffmpeg_params,
+            ffmpeg_parameters=ffmpeg_params, # 🔥 INJECTED POWER
         )
     else:
         return MediaStream(
@@ -109,7 +73,7 @@ def dynamic_media_stream(path: str, video: bool = False, ffmpeg_params: str = No
             audio_parameters=AudioQuality.STUDIO,
             audio_flags=MediaStream.Flags.REQUIRED,
             video_flags=MediaStream.Flags.IGNORE,
-            ffmpeg_parameters=ffmpeg_params,
+            ffmpeg_parameters=ffmpeg_params, # 🔥 INJECTED POWER
         )
 
 async def _clear_(chat_id: int) -> None:
@@ -123,40 +87,31 @@ async def _clear_(chat_id: int) -> None:
 
 class Call:
     def __init__(self):
-        # 🔥 TitanOS Smart Cache
-        # Dynamically calculate cache based on available RAM/CPU logic
-        cores = os.cpu_count() or 1
-        if cores <= 2:
-            smart_cache = 50   # Keep RAM usage low
-        elif cores <= 4:
-            smart_cache = 100  # Standard
-        else:
-            smart_cache = 200  # Max stability
-
+        # 🔥 TitanOS: Increased Cache Duration to 200s for stability on 16-Core Server
         self.userbot1 = Client(
             "AnnieXAssis1", config.API_ID, config.API_HASH, session_string=config.STRING1
         ) if config.STRING1 else None
-        self.one = PyTgCalls(self.userbot1, cache_duration=smart_cache) if self.userbot1 else None
+        self.one = PyTgCalls(self.userbot1, cache_duration=200) if self.userbot1 else None
 
         self.userbot2 = Client(
             "AnnieXAssis2", config.API_ID, config.API_HASH, session_string=config.STRING2
         ) if config.STRING2 else None
-        self.two = PyTgCalls(self.userbot2, cache_duration=smart_cache) if self.userbot2 else None
+        self.two = PyTgCalls(self.userbot2, cache_duration=200) if self.userbot2 else None
 
         self.userbot3 = Client(
             "AnnieXAssis3", config.API_ID, config.API_HASH, session_string=config.STRING3
         ) if config.STRING3 else None
-        self.three = PyTgCalls(self.userbot3, cache_duration=smart_cache) if self.userbot3 else None
+        self.three = PyTgCalls(self.userbot3, cache_duration=200) if self.userbot3 else None
 
         self.userbot4 = Client(
             "AnnieXAssis4", config.API_ID, config.API_HASH, session_string=config.STRING4
         ) if config.STRING4 else None
-        self.four = PyTgCalls(self.userbot4, cache_duration=smart_cache) if self.userbot4 else None
+        self.four = PyTgCalls(self.userbot4, cache_duration=200) if self.userbot4 else None
 
         self.userbot5 = Client(
             "AnnieXAssis5", config.API_ID, config.API_HASH, session_string=config.STRING5
         ) if config.STRING5 else None
-        self.five = PyTgCalls(self.userbot5, cache_duration=smart_cache) if self.userbot5 else None
+        self.five = PyTgCalls(self.userbot5, cache_duration=200) if self.userbot5 else None
 
         self.active_calls: set[int] = set()
         self.turbo_mode = {} 
@@ -250,13 +205,10 @@ class Call:
         os.makedirs(chatdir, exist_ok=True)
         out = os.path.join(chatdir, base)
 
-        # Smart Speedup Processing - Uses same logic as main stream
-        cores = os.cpu_count() or 1
-        speed_threads = str(max(1, cores - 1)) # Use almost all cores
-        
         if not os.path.exists(out):
+            # 🔥 TitanOS: Use multi-threads for speedup processing too
             vs = str(2.0 / float(speed))
-            cmd = f'ffmpeg -threads {speed_threads} -i "{file_path}" -filter:v "setpts={vs}*PTS" -filter:a atempo={speed} -y "{out}"'
+            cmd = f'ffmpeg -threads 8 -i "{file_path}" -filter:v "setpts={vs}*PTS" -filter:a atempo={speed} -y "{out}"'
             proc = await asyncio.create_subprocess_shell(
                 cmd,
                 stdin=asyncio.subprocess.PIPE,
