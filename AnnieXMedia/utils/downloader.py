@@ -54,17 +54,9 @@ def get_cookie_file() -> Optional[str]:
         pass
     return None
 
-
-def find_cached_file(video_id: str) -> Optional[str]:
-    if not video_id:
-        return None
-    for ext in ("mp3", "m4a", "webm", "mp4", "mkv"):
-        path = f"{DOWNLOAD_DIR}/{video_id}.{ext}"
-        if os.path.exists(path):
-            return path
-    return None
-
-
+# ==========================================
+# تــعــديــل الــســرعــة (Aria2 Integrated)
+# ==========================================
 def get_ytdlp_base_opts() -> Dict[str, object]:
     opts = {
         "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
@@ -74,18 +66,37 @@ def get_ytdlp_base_opts() -> Dict[str, object]:
         "overwrites": False,
         "continuedl": True,
         "noprogress": True,
-        "concurrent_fragment_downloads": 16,
-        "http_chunk_size": 1 << 20,
-        "socket_timeout": 15,
-        "retries": 1,
-        "fragment_retries": 1,
+        "socket_timeout": 30,
+        "retries": 5,
+        "fragment_retries": 5,
         "cachedir": str(CACHE_DIR),
         "ignoreerrors": True,
-        "merge_output_format": "mp4"
+        "merge_output_format": "mp4",
+        
+        # 🚀 تــفــعــيــل Aria2 هــنــا
+        "external_downloader": "aria2c",
+        "external_downloader_args": [
+            "-c",            # استكمال التحميل
+            "-j", "16",      # 16 ملف في نفس الوقت
+            "-x", "16",      # 16 اتصال لكل سيرفر
+            "-s", "16",      # تقسيم الملف 16 حتة
+            "-k", "1M",      # أقل حجم للتقسيم 1 ميجا
+            "--disk-cache=128M" # تخزين مؤقت في الرامات
+        ]
     }
     if cookiefile := get_cookie_file():
         opts["cookiefile"] = cookiefile
     return opts
+
+
+def find_cached_file(video_id: str) -> Optional[str]:
+    if not video_id:
+        return None
+    for ext in ("mp3", "m4a", "webm", "mp4", "mkv"):
+        path = f"{DOWNLOAD_DIR}/{video_id}.{ext}"
+        if os.path.exists(path):
+            return path
+    return None
 
 
 async def get_http_session() -> aiohttp.ClientSession:
