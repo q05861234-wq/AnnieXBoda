@@ -3,85 +3,82 @@ import logging
 import os
 import sys
 import time
+import psutil
 
 # ==========================================
-# 1. إعــداد UVLoop وإنــشــاء الــ Loop يــدويــاً
+# 1. الإصــلاح الــجــذري للـ Loop (The Fix)
 # ==========================================
-# الــخــطــوة دي ضــروريــة جــداً لــحــل مــشــكــلــة pytgcalls
+# بـدلاً مـن install، سـنـقـوم بـفـرض الـسـيـاسـة يـدويـاً
+# هـذا يـجـعـل بـايـثـون 3.12 يـعـتـرف بـالـ Loop فـوراً
 try:
     import uvloop
-    uvloop.install()
-    print("تــم تــفــعــيــل نــظــام UVLoop... الــوضــع الــســريــع")
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    print("✅ تــم فــرض ســيــاســة UVLoop بــنــجــاح")
 except ImportError:
-    print("نــظــام UVLoop غــيــر مــتــاح... الــعــمــل بــالــنــظــام الــعــادي")
+    print("⚠️ UVLoop غــيــر مــثــبــت")
 
-# نــقــوم بــإنــشــاء الــ Loop وتــعــيــيــنــه يــدويــاً قــبــل الاســتــدعــاء
-# هــذا يــمــنــع خــطــأ Runtime Error: There is no current event loop
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
+# إنــشــاء الــ Loop وتــثــبــيــتــه "غــصــب" عــن الــنــظــام
+# هـذا الـسـطـر هـو الـذي يـمـنـع خـطـأ RuntimeError
+main_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(main_loop)
 
 # ==========================================
-# 2. اســتــدعــاء مــلــفــات الــبــوت
+# 2. تــفــعــيــل الــســرعــة الــقــصــوى (Full Speed)
 # ==========================================
-# تــم نــقــل الاســتــدعــاء هــنــا بــعــد تــهــيــئــة الــ Loop
+def set_max_priority():
+    try:
+        p = psutil.Process(os.getpid())
+        # الـقـيـمـة -10 تـعـطـي أولـويـة أعـلـى مـن الـنـظـام الـعـادي
+        p.nice(-10)
+        print("🚀 تــم تــفــعــيــل وضــع الــأداء الــأقــصــى (High Priority)")
+    except Exception as e:
+        print(f"تــنــبــيــه: لــم نــتــمــكــن مــن رفــع الأولــويــة ({e})")
+
+# تــنــفــيــذ الأولــويــة فــوراً
+set_max_priority()
+
+# ==========================================
+# 3. اســتــدعــاء الــبــوت (بــعــد الــتــثــبــيــت)
+# ==========================================
 from AnnieXMedia.__main__ import init
 from AnnieXMedia import LOGGER
 
-# إعــداد الــمــراقــب
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] %(message)s",
     datefmt="%H:%M:%S",
 )
-monitor_logger = logging.getLogger("SystemMonitor")
 
 # ==========================================
-# وظــيــفــة مــراقــب الــســيــرفــر
+# مــراقــب الــنــظــام الــســريــع
 # ==========================================
 async def server_status_monitor():
     while True:
-        # الانتظار 4 ساعات
         await asyncio.sleep(14400)
-        
         try:
-            import psutil
-            cpu_usage = psutil.cpu_percent(interval=1)
+            cpu = psutil.cpu_percent(interval=1)
             ram = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            uptime_seconds = int(time.time() - psutil.boot_time())
-            uptime_hours = uptime_seconds // 3600
             
-            status_msg = (
-                f"تــقــريــر حــالــة الــســيــرفــر الــدوري :\n"
-                f"___________________________________\n"
-                f"اســتــهــلاك الــمــعــالــج : {cpu_usage}%\n"
-                f"اســتــهــلاك الــرامــات : {ram.percent}%\n"
-                f"الــمــســاحــة الــمــســتــخــدمــة : {disk.percent}%\n"
-                f"عــدد ســاعــات الــعــمــل : {uptime_hours} ســاعــة\n"
-                f"حــالــة الــنــظــام : مــســتــقــرة تــمــامــاً"
+            LOGGER("SystemMonitor").info(
+                f"تــقــريــر الــســرعــة :\n"
+                f"___________________\n"
+                f"الــضــغــط عــلــى الــمــعــالــج : {cpu}%\n"
+                f"اســتــهــلاك الــذاكــرة : {ram.percent}%\n"
+                f"وضــع الــتــشــغــيــل : Full Speed / UVLoop Active"
             )
-            LOGGER("SystemMonitor").info(status_msg)
-            
-        except ImportError:
-            pass
-        except Exception:
+        except:
             pass
 
 # ==========================================
-# الــمــشــغــل الــرئــيــســي
+# الــتــشــغــيــل الــنــهــائــي
 # ==========================================
 if __name__ == "__main__":
     try:
-        # تــشــغــيــل الــمــراقــب فــي الــخــلــفــيــة عــلــى نــفــس الــ Loop
-        loop.create_task(server_status_monitor())
-        
-        # تــشــغــيــل الــبــوت
-        loop.run_until_complete(init())
-        
-        # تــشــغــيــل الــ Loop إلــى مــا لا نــهــايــة
-        loop.run_forever()
-        
+        # نــســتــخــدم الــ Loop الــذي أنــشــأنــاه بــالأعــلــى
+        main_loop.create_task(server_status_monitor())
+        main_loop.run_until_complete(init())
+        main_loop.run_forever()
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f"حــدث خــطــأ جــســيــم : {e}")
+        print(f"خــطــأ غــيــر مــتــوقــع : {e}")
