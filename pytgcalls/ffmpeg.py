@@ -176,18 +176,19 @@ def build_command(
 
     ffmpeg_command += command['start']
 
+    # 🔥 HERE IS THE MAGIC (MODIFIED BY TITANOS) 🔥
     if not os.path.exists(path) \
             and not is_livestream\
             and name == 'ffmpeg':
         ffmpeg_command += [
-            '-reconnect',
-            '1',
-            '-reconnect_at_eof',
-            '1',
-            '-reconnect_streamed',
-            '1',
-            '-reconnect_delay_max',
-            '2',
+            '-reconnect', '1',
+            '-reconnect_at_eof', '1',
+            '-reconnect_streamed', '1',
+            '-reconnect_delay_max', '5', # Increased delay tolerance
+            '-probesize', '32M',         # Giant Buffer
+            '-analyzeduration', '15M',   # Deep Analysis
+            '-err_detect', 'ignore_err', # Ignore small corruptions
+            '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36', # Anti-Block
         ]
 
     if name == 'ffprobe':
