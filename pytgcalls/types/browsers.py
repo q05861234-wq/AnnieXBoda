@@ -4,10 +4,10 @@ from .user_agent import UserAgent
 
 class Browsers:
     def __init__(self):
-        # CHROME BASE AGENT
+        # 🔥 TitanOS Update: Latest Chrome Version (2024/2025)
         self._chrome_agent = AgentInfo(
             'Chrome',
-            '94.0.4606.71',
+            '124.0.0.0', # Updated from 94
         )
 
         # MOZILLA BASE AGENTS
@@ -15,13 +15,13 @@ class Browsers:
             'Mozilla',
             '5.0',
             'Linux',
-            'Android 10',
+            'Android 13', # Updated to Android 13
         )
         self._mozilla_ios_agent = AgentInfo(
             'Mozilla',
             '5.0',
             'iPhone',
-            'CPU iPhone OS 15_0 like Mac OS X',
+            'CPU iPhone OS 17_4 like Mac OS X', # Updated to iOS 17
         )
         self._mozilla_linux_agent = AgentInfo(
             'Mozilla',
@@ -33,7 +33,7 @@ class Browsers:
             'Mozilla',
             '5.0',
             'Macintosh',
-            'Intel Mac OS X 11_6',
+            'Intel Mac OS X 14_4', # Updated to macOS Sonoma
         )
         self._mozilla_windows_agent = AgentInfo(
             'Mozilla',
@@ -75,46 +75,41 @@ class Browsers:
             '604.1',
         )
 
-        # EDGE BASE AGENT
+        # EDGE BASE AGENT (Updated to Chromium Edge)
         self._edge_android_agent = AgentInfo(
             'EdgA',
-            '93.0.961.53',
+            '124.0.0.0',
         )
         self._edge_ios_agent = AgentInfo(
             'EdgiOS',
-            '93.961.64',
+            '124.0.0.0',
         )
         self._edge_pc_agent = AgentInfo(
             'Edg',
-            '94.0.992.31',
+            '124.0.0.0',
         )
-        self._edge_windows_mob_agent = AgentInfo(
-            'Edge',
-            '40.15254.603',
-        )
-        self._edge_xbox_agent = AgentInfo(
-            'Edge',
-            '44.18363.8131',
-        )
+        # Removed obsolete Edge Mobile/Xbox agents to avoid detection
+        self._edge_windows_mob_agent = AgentInfo('Edge', '124.0.0.0') 
+        self._edge_xbox_agent = AgentInfo('Edge', '124.0.0.0')
 
         # FIREFOX BASE AGENT
         self._firefox_default_agent = AgentInfo(
             'Firefox',
-            '92.0',
+            '125.0', # Updated to latest FF
         )
         self._firefox_ios_agent = AgentInfo(
             'FxiOS',
-            '38.0',
+            '125.0',
         )
 
         # OPERA BASE AGENT
         self._opera_default_agent = AgentInfo(
             'OPR',
-            '79.0.4143.66',
+            '109.0.0.0', # Updated Opera
         )
         self._opera_mobile_agent = AgentInfo(
             'OPR',
-            '63.3.3216.58675',
+            '81.0.0.0',
         )
 
     # CHROME
@@ -164,6 +159,7 @@ class Browsers:
 
     @property
     def chrome_windows(self):
+        # 🔥 This is the GOLDEN AGENT (Most supported)
         return str(
             UserAgent([
                 self._mozilla_windows_agent,
