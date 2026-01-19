@@ -1,4 +1,4 @@
-# Authored By Certified Coders © 2025
+﻿# Authored By Certified Coders © 2025
 import sys
 from pyrogram import Client, errors
 from pyrogram.enums import ChatMemberStatus
@@ -17,11 +17,10 @@ class MusicBotClient(Client):
             workers=48,
             max_concurrent_transmissions=7,
         )
-        LOGGER(__name__).info("تم تهيئة عميل البوت بنجاح وجاهز للاقلاع.")
+        LOGGER(__name__).info("Bot client initialized.")
 
-    async def start(self, *args, **kwargs):
+    async def start(self):
         await super().start()
-        
         me = await self.get_me()
         self.username, self.id = me.username, me.id
         self.name = f"{me.first_name} {me.last_name or ''}".strip()
@@ -31,26 +30,26 @@ class MusicBotClient(Client):
             await self.send_message(
                 config.LOGGER_ID,
                 (
-                    f"<u><b>» {self.mention} يـا عـزيـزي لـقـد بـدأ الـعـمـل :</b></u>\n\n"
-                    f"الايـدي : <code>{self.id}</code>\n"
-                    f"الاسـم : {self.name}\n"
-                    f"الـمـعـرف : @{self.username}"
+                    f"<u><b>» {self.mention} ʙᴏᴛ sᴛᴀʀᴛᴇᴅ :</b></u>\n\n"
+                    f"ɪᴅ : <code>{self.id}</code>\n"
+                    f"ɴᴀᴍᴇ : {self.name}\n"
+                    f"ᴜsᴇʀɴᴀᴍᴇ : @{self.username}"
                 ),
             )
         except (errors.ChannelInvalid, errors.PeerIdInvalid):
-            LOGGER(__name__).error("البوت لا يستطيع الوصول لمجموعة السجل (Logger Group) - تاكد من اضافته ورفعه مشرفا!")
+            LOGGER(__name__).error("❌ Bot cannot access the log group/channel – add & promote it first!")
             sys.exit()
         except Exception as exc:
-            LOGGER(__name__).error(f"فشل البوت في الاتصال بمجموعة السجل.\nالسبب: {type(exc).__name__}")
+            LOGGER(__name__).error(f"❌ Bot has failed to access the log group.\nReason: {type(exc).__name__}")
             sys.exit()
 
         try:
             member = await self.get_chat_member(config.LOGGER_ID, self.id)
             if member.status != ChatMemberStatus.ADMINISTRATOR:
-                LOGGER(__name__).error("يرجى رفع البوت مشرفا (Admin) في مجموعة السجل ليعمل بشكل صحيح.")
+                LOGGER(__name__).error("❌ Promote the bot as admin in the log group/channel.")
                 sys.exit()
         except Exception as e:
-            LOGGER(__name__).error(f"فشل التحقق من صلاحيات المشرف: {e}")
+            LOGGER(__name__).error(f"❌ Could not check admin status: {e}")
             sys.exit()
 
-        LOGGER(__name__).info(f"تم بدء تشغيل بوت الميوزك بنجاح باسم: {self.name} (@{self.username})")
+        LOGGER(__name__).info(f"✅ Music Bot started as {self.name} (@{self.username})")
