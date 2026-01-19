@@ -2,7 +2,8 @@ app = "anniexboda-ma1e5q"
 primary_region = "iad"
 
 [processes]
-  app = "python3 -m AnnieXMedia"
+  # هنا التغيير: خلينا الأمر يشغل ملف الرونر مباشرة
+  app = "python3 runner.py"
 
 [[vm]]
   cpu_kind = "shared"
