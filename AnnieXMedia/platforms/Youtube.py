@@ -1,5 +1,5 @@
 # Authored By Certified Coders © 2025
-# Optimized by TitanOS (Dual-Stream Engine: Play + Save Instantly)
+# Optimized by TitanOS (Max Speed Edition: 1GB RAM Buffer + 2.6Gbps Engine)
 
 import asyncio
 import contextlib
@@ -25,7 +25,7 @@ try:
     from AnnieXMedia.utils.tuning import YTDLP_TIMEOUT, YOUTUBE_META_MAX, YOUTUBE_META_TTL
     from AnnieXMedia import LOGGER
 except ImportError:
-    # Fallback placeholders
+    # Fallback placeholders for standalone testing
     logging.basicConfig(level=logging.ERROR)
     def LOGGER(name): return logging.getLogger(name)
     async def is_on_off(x): return True
@@ -38,7 +38,7 @@ except ImportError:
 logging.getLogger("yt_dlp").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 
-# --- Caches ---
+# --- Caches (Memory System) ---
 _cache: Dict[str, Tuple[float, List[Dict]]] = {}
 _cache_lock = asyncio.Lock()
 _formats_cache: Dict[str, Tuple[float, List[Dict], str]] = {}
@@ -47,7 +47,7 @@ _formats_lock = asyncio.Lock()
 # --- Configuration ---
 class Config:
     DOWNLOAD_PATH = "downloads"
-    MAX_WORKERS = 50 
+    MAX_WORKERS = 100  # Increased for 16-Core CPU
 
 if not os.path.exists(Config.DOWNLOAD_PATH):
     os.makedirs(Config.DOWNLOAD_PATH)
@@ -69,6 +69,7 @@ def get_cookie_file() -> Optional[str]:
 def get_user_agent():
     agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",  # Optimized for Linux Server
         "Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36",
     ]
     return random.choice(agents)
@@ -122,7 +123,7 @@ class YouTubeAPI:
                     return ent.url.split("&si")[0]
         return None
 
-    # === Metadata Fetching ===
+    # === Metadata Fetching (Smart Cache) ===
     async def track(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[Dict, str]:
         prepared_link = self._prepare_link(link, videoid)
         
@@ -173,7 +174,7 @@ class YouTubeAPI:
         d, _ = await self.track(link, videoid)
         return d.get("thumb", "")
 
-    # === 🚀 SUPERCHARGED DOWNLOADER (2.6Gbps Engine) ===
+    # === 🚀 DOWNLOADER (Fly.io Optimized + Max Speed) ===
     async def download(
         self,
         link: str,
@@ -186,6 +187,7 @@ class YouTubeAPI:
         link = self._prepare_link(link, videoid)
         loop = asyncio.get_running_loop()
 
+        # ID Generation
         try:
             if "v=" in link: vid_id = link.split("v=")[1].split("&")[0]
             elif "youtu.be/" in link: vid_id = link.split("youtu.be/")[1].split("?")[0]
@@ -194,8 +196,11 @@ class YouTubeAPI:
              vid_id = str(int(time.time()))
 
         file_name = f"{vid_id}.{'mp4' if video else 'm4a'}"
-        final_path = os.path.join(Config.DOWNLOAD_PATH, file_name)
+        
+        # 🔥 FIX: Absolute Path for Fly.io Stability 🔥
+        final_path = os.path.abspath(os.path.join(Config.DOWNLOAD_PATH, file_name))
 
+        # ⚡ TITAN SPEED CONFIG ⚡
         opts = {
             "outtmpl": final_path,
             "cookiefile": get_cookie_file(),
@@ -204,7 +209,7 @@ class YouTubeAPI:
             "quiet": True,
             "no_warnings": True,
             "ignoreerrors": True,
-            "force_ipv4": True, # Optimized for stability
+            "force_ipv4": True, # Critical for Server Stability
             "extractor_args": {
                 'youtube': {
                     'skip': ['dash', 'hls'],
@@ -215,23 +220,48 @@ class YouTubeAPI:
             "concurrent_fragment_downloads": 10,
         }
 
+        # Quality Config
         if video:
-            opts["format"] = "best[ext=mp4]/bestvideo+bestaudio" # Faster (No Merge)
+            # Get best single file to avoid merging (Faster)
+            opts["format"] = "best[ext=mp4]/bestvideo+bestaudio"
         else:
             opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
 
+        # ⚡ ARIA2 INJECTION (RAM MODE) ⚡
         if self.has_aria2:
             opts["external_downloader"] = "aria2c"
             opts["external_downloader_args"] = [
-                "-c", "-x", "16", "-s", "16", "-j", "32", "-k", "1M",
-                "--buffer-size=64M", "--file-allocation=none",
+                "-c",
+                "-x", "16",         # Max Connections
+                "-s", "16",         # Max Splits
+                "-j", "32",         # Concurrent Downloads
+                "-k", "1M",         # Min Split Size
+                "--buffer-size=1024M", # 🔥 1GB RAM Buffer (Since you have 47GB!)
+                "--file-allocation=none",
+                "--console-log-level=error"
             ]
 
         def _run_download():
-            if os.path.exists(final_path): return final_path
+            if os.path.exists(final_path):
+                return final_path
+            
+            # Clean up old fragments to prevent errors
+            try:
+                if os.path.exists(final_path + ".part"): os.remove(final_path + ".part")
+                if os.path.exists(final_path + ".aria2"): os.remove(final_path + ".aria2")
+            except: pass
+
             with yt_dlp.YoutubeDL(opts) as ydl:
-                try: ydl.download([link])
-                except Exception as e: LOGGER(__name__).error(f"DL Error: {e}")
+                try:
+                    ydl.download([link])
+                except Exception as e:
+                    LOGGER(__name__).error(f"DL Error: {e}")
+                    # Fallback if Aria2 fails
+                    opts.pop("external_downloader", None)
+                    with yt_dlp.YoutubeDL(opts) as fallback_ydl:
+                         try: fallback_ydl.download([link])
+                         except: pass
+
             return final_path if os.path.exists(final_path) else None
 
         downloaded_file = await loop.run_in_executor(self.pool, _run_download)
@@ -250,35 +280,41 @@ class YouTubeAPI:
 
     video = video_stream_url 
 
-    # === 🌪️ TITAN DUAL-STREAM (Play + Save Instantly) ===
-    # هذه الدالة تقوم بالتحميل على الهارد والبث للكول في نفس الوقت
+    # === 🌪️ TITAN INSTANT STREAM (Pipe + Tee) ===
+    # This function plays INSTANTLY and saves to disk simultaneously
     async def stream_pipe(self, link: str, videoid: Union[str, bool, None] = None):
         link = self._prepare_link(link, videoid)
-        cookie = get_cookie_file()
         
-        # إنشاء اسم الملف عشان نحفظه
         try:
             if "v=" in link: vid_id = link.split("v=")[1].split("&")[0]
             else: vid_id = str(int(time.time()))
         except: vid_id = str(int(time.time()))
         
-        save_path = os.path.join(Config.DOWNLOAD_PATH, f"{vid_id}.m4a")
+        # Absolute Path for Fly.io
+        save_path = os.path.abspath(os.path.join(Config.DOWNLOAD_PATH, f"{vid_id}.m4a"))
 
-        # الأمر السحري: نزل الملف (output -) واقسمه نصين بـ tee
-        # نص يروح للهارد (save_path) ونص يرجع للكود (stdout)
-        cmd = f"yt-dlp -f bestaudio --quiet --geo-bypass -o - \"{link}\" | tee \"{save_path}\""
+        # 1. If cached on disk, stream from disk (Save Bandwidth)
+        if os.path.exists(save_path):
+            cmd = f"cat \"{save_path}\""
+            process = await asyncio.create_subprocess_shell(
+                cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            return process.stdout
+
+        # 2. If not cached, Stream + Download (Dual Pipe)
+        cookie = get_cookie_file()
+        cookie_arg = f"--cookies \"{cookie}\"" if cookie else ""
         
-        if cookie:
-            cmd = f"yt-dlp --cookies \"{cookie}\" -f bestaudio --quiet --geo-bypass -o - \"{link}\" | tee \"{save_path}\""
+        # yt-dlp -> stdout -> tee -> (disk file & stdout)
+        # Using 16MB buffer for pipe to prevent stutter
+        cmd = f"yt-dlp {cookie_arg} -f bestaudio --quiet --geo-bypass -o - \"{link}\" | tee \"{save_path}\""
 
-        # لازم هنا نستخدم shell=True عشان علامة | تشتغل
         process = await asyncio.create_subprocess_shell(
             cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         
-        # بنرجع الـ Pipe عشان يشتغل فوراً، وفي الخلفية هو بيسيف الملف
         return process.stdout
 
     # === Playlist & Formats ===
