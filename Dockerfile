@@ -5,7 +5,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
-# تفعيل خيارات السرعة القصوى لـ Aria2 (بما فيها الرام بافر)
+# تفعيل خيارات السرعة القصوى لـ Aria2
 ENV ARIA2_OPTS="--max-connection-per-server=16 --split=16 --min-split-size=1M --buffer-size=64M"
 
 WORKDIR /app
@@ -14,10 +14,10 @@ WORKDIR /app
 RUN rm -rf /app/*
 
 # -------------------------------------------------------------
-# 1. تجهيز أدوات البناء وتجميع Aria2 من المصدر (GitHub)
+# 1. تجهيز أدوات البناء وتجميع Aria2 من المصدر
 # -------------------------------------------------------------
 RUN apt-get update && \
-    # تثبيت المكتبات اللازمة لبناء Aria2 و FFmpeg
+    # ✅ تم إضافة gettext هنا عشان تحل مشكلة autopoint
     apt-get install -y --no-install-recommends \
     git \
     ffmpeg \
@@ -28,6 +28,7 @@ RUN apt-get update && \
     automake \
     libtool \
     pkg-config \
+    gettext \
     libxml2-dev \
     libcppunit-dev \
     libgcrypt-dev \
@@ -37,7 +38,7 @@ RUN apt-get update && \
     libssh2-1-dev \
     libssl-dev && \
     \
-    # ⬇️ هنا السحر: تحميل وبناء Aria2 من السورس كود الرسمي ⬇️
+    # ⬇️ بناء Aria2 من السورس كود ⬇️
     echo "Building latest Aria2 from Source..." && \
     git clone https://github.com/aria2/aria2.git && \
     cd aria2 && \
@@ -48,11 +49,11 @@ RUN apt-get update && \
     cd .. && \
     rm -rf aria2 && \
     \
-    # تثبيت Deno (لو مطلوب)
+    # تثبيت Deno
     curl -fsSL https://deno.land/install.sh | sh && \
     ln -s /root/.deno/bin/deno /usr/local/bin/deno && \
     \
-    # تنظيف ملفات الكاش لتقليل حجم الصورة
+    # تنظيف
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -63,22 +64,22 @@ COPY pytgcalls /app/pytgcalls
 
 COPY requirements.txt /app/requirements.txt
 
-# حذف py-tgcalls من الملف عشان نستخدم النسخة المحلية
+# فلترة المتطلبات
 RUN if [ -f /app/requirements.txt ]; then \
       grep -v -i '^py-tgcalls' /app/requirements.txt > /app/filtered-requirements.txt || true; \
     fi
 
-# تثبيت المتطلبات و uvloop
+# تثبيت المكتبات
 RUN pip install --upgrade pip setuptools wheel && \
     pip install uvloop && \
     if [ -f /app/filtered-requirements.txt ]; then pip install --no-cache-dir -r /app/filtered-requirements.txt; fi
 
 # -------------------------------------------------------------
-# 3. نسخ باقي ملفات البوت وتشغيل الاختبار
+# 3. نسخ باقي ملفات البوت
 # -------------------------------------------------------------
 COPY . /app
 
-# تأكيد ان Python بيستخدم النسخة المحلية
+# اختبار النسخة المحلية
 RUN python - <<'PY'
 import pytgcalls, sys
 print('PYTGCALLS_FROM=', getattr(pytgcalls,'__file__','<not found>'))
