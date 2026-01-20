@@ -1,5 +1,8 @@
-# Authored By Certified Coders © 2025
-# Hybrid Engine: Alexa Logic + Aria2 Power 🚀
+# ==============================================================================
+#  UNIVERSAL DOWNLOADER ENGINE © 2025
+#  Architecture: S25 Ultra Spoofing | Aria2 Integration | Hybrid API Race
+#  Supports: SoundCloud, Spotify, Apple Music, etc.
+# ==============================================================================
 
 import asyncio
 import contextlib
@@ -34,106 +37,105 @@ YOUTUBE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
 # Auto-detect Aria2 path
 ARIA2_PATH = shutil.which("aria2c") or "/usr/bin/aria2c"
 
+# ==============================================================================
+#  SYSTEM CONFIGURATION (MATCHING YOUTUBE CORE)
+# ==============================================================================
+
+class SystemConfig:
+    # Aria2 Turbo Settings (16 Connections)
+    ARIA2_ARGS = [
+        "-c", "-x", "16", "-s", "16", "-j", "32", "-k", "1M",
+        "--min-split-size=1M", "--file-allocation=none",
+        "--buffer-size=1024M", "--max-connection-per-server=16",
+        "--quiet=true"
+    ]
+
+    # S25 Ultra User Agents
+    USER_AGENTS = [
+        "Mozilla/5.0 (Linux; Android 15; SM-S938B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 15; SM-S938U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.144 Mobile Safari/537.36"
+    ]
+
 def log_download_source(title: str, source: str) -> None:
     LOGGER.info(f"Track '{title}' - Downloaded by {source}")
 
 def extract_video_id(link: str) -> str:
-    if not link:
-        return ""
+    if not link: return ""
     s = link.strip()
-    if YOUTUBE_ID_RE.match(s):
-        return s
-    if "v=" in s:
-        return s.split("v=")[-1].split("&")[0]
+    if YOUTUBE_ID_RE.match(s): return s
+    if "v=" in s: return s.split("v=")[-1].split("&")[0]
     last = s.split("/")[-1].split("?")[0]
-    if YOUTUBE_ID_RE.match(last):
-        return last
+    if YOUTUBE_ID_RE.match(last): return last
     return ""
 
 def get_cookie_file() -> Optional[str]:
-    # Check main cookie file
+    # Priority 1: Configured Path
     try:
         if _COOKIES_FILE and os.path.exists(_COOKIES_FILE) and os.path.getsize(_COOKIES_FILE) > 0:
             return _COOKIES_FILE
-    except Exception:
-        pass
+    except: pass
     
-    # Check cookies folder (Rotation Logic)
+    # Priority 2: Root File
+    if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 0:
+        return "cookies.txt"
+
+    # Priority 3: Rotation Folder
     if os.path.exists("cookies"):
         try:
             files = [f for f in os.listdir("cookies") if f.endswith(".txt")]
-            if files:
-                return os.path.join("cookies", random.choice(files))
-        except Exception:
-            pass
-            
+            if files: return os.path.join("cookies", random.choice(files))
+        except: pass     
     return None
 
-# ==========================================
-# Alexa Logic + Aria2 Configuration
-# ==========================================
+# ==============================================================================
+#  CORE DOWNLOADER LOGIC
+# ==============================================================================
+
 def get_ytdlp_base_opts() -> Dict[str, object]:
     opts = {
         "outtmpl": f"{DOWNLOAD_DIR}/%(id)s.%(ext)s",
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
-        "overwrites": False,
-        "continuedl": True,
-        "noprogress": True,
-        "socket_timeout": 10,
-        "retries": 10,
-        "cachedir": str(CACHE_DIR),
-        "ignoreerrors": True,
+        "quiet": True, "no_warnings": True, "noplaylist": True,
+        "overwrites": False, "continuedl": True, "noprogress": True,
+        "socket_timeout": 15, "retries": 10,
+        "cachedir": str(CACHE_DIR), "ignoreerrors": True,
         
         # Network optimizations
-        "geo_bypass": True,            
-        "nocheckcertificate": True,    
-        "source_address": "0.0.0.0",   
+        "geo_bypass": True, "nocheckcertificate": True, "source_address": "0.0.0.0",   
 
-        # Client Spoofing (Android)
+        # Client Spoofing (S25 Ultra)
+        "user_agent": random.choice(SystemConfig.USER_AGENTS),
         "extractor_args": {
             "youtube": {
                 "player_client": ["android", "web"],
                 "player_skip": ["configs", "js"],
             }
         },
-
-        # Aria2 Engine Settings
-        "external_downloader": ARIA2_PATH,
-        "external_downloader_args": [
-            "-c",
-            "-j", "16",
-            "-x", "16",
-            "-s", "16",
-            "-k", "1M",
-            "--min-split-size=1M",
-            "--file-allocation=none",
-            "--buffer-size=32M",
-        ]
     }
+
+    # Aria2 Integration
+    if ARIA2_PATH:
+        opts["external_downloader"] = ARIA2_PATH
+        opts["external_downloader_args"] = SystemConfig.ARIA2_ARGS
+
     if cookiefile := get_cookie_file():
         opts["cookiefile"] = cookiefile
     return opts
 
 
 def find_cached_file(video_id: str) -> Optional[str]:
-    if not video_id:
-        return None
+    if not video_id: return None
     for ext in ("mp3", "m4a", "webm", "mp4", "mkv"):
         path = f"{DOWNLOAD_DIR}/{video_id}.{ext}"
-        if os.path.exists(path):
-            return path
+        if os.path.exists(path): return path
     return None
 
 
 async def get_http_session() -> aiohttp.ClientSession:
     global _session
-    if _session and not _session.closed:
-        return _session
+    if _session and not _session.closed: return _session
     async with _session_lock:
-        if _session and not _session.closed:
-            return _session
+        if _session and not _session.closed: return _session
         timeout = aiohttp.ClientTimeout(total=600, sock_connect=20, sock_read=60)
         connector = TCPConnector(limit=0, ttl_dns_cache=300, enable_cleanup_closed=True)
         _session = aiohttp.ClientSession(timeout=timeout, connector=connector)
@@ -143,99 +145,78 @@ async def get_http_session() -> aiohttp.ClientSession:
 async def close_http_session() -> None:
     global _session
     async with _session_lock:
-        if _session and not _session.closed:
-            await _session.close()
+        if _session and not _session.closed: await _session.close()
         _session = None
 
 
 async def download_file(url: str, out_path: str) -> Optional[str]:
-    if not url:
-        return None
+    if not url: return None
     try:
         session = await get_http_session()
         async with session.get(url) as resp:
-            if resp.status != 200:
-                return None
+            if resp.status != 200: return None
             async with aiofiles.open(out_path, "wb") as f:
                 async for chunk in resp.content.iter_chunked(CHUNK_SIZE):
-                    if not chunk:
-                        break
+                    if not chunk: break
                     await f.write(chunk)
         return out_path if os.path.exists(out_path) else None
-    except Exception:
-        return None
+    except: return None
 
 
 async def api_download_audio(link: str) -> Optional[str]:
-    if not USE_AUDIO_API:
-        return None
+    if not USE_AUDIO_API: return None
     vid = extract_video_id(link)
-    if not vid:
-        return None
+    if not vid: return None
     poll_url = f"{API_URL}/song/{vid}?api={API_KEY}"
     try:
         session = await get_http_session()
         while True:
             async with session.get(poll_url) as r:
-                if r.status != 200:
-                    return None
+                if r.status != 200: return None
                 data = await r.json()
                 status = str(data.get("status", "")).lower()
                 if status == "downloading":
                     await asyncio.sleep(1.0)
                     continue
-                if status != "done":
-                    return None
+                if status != "done": return None
                 dl_url = data.get("link")
                 fmt = data.get("format", "webm")
                 out_path = f"{DOWNLOAD_DIR}/{vid}.{fmt}"
                 return await download_file(dl_url, out_path)
-    except Exception:
-        return None
+    except: return None
 
 
 async def api_download_video(link: str) -> Optional[str]:
-    if not USE_VIDEO_API:
-        return None
+    if not USE_VIDEO_API: return None
     vid = extract_video_id(link)
-    if not vid:
-        return None
+    if not vid: return None
     poll_url = f"{VIDEO_API_URL}/video/{vid}?api={API_KEY}"
     try:
         session = await get_http_session()
         while True:
             async with session.get(poll_url) as r:
-                if r.status != 200:
-                    return None
+                if r.status != 200: return None
                 data = await r.json()
                 status = str(data.get("status", "")).lower()
                 if status == "downloading":
                     await asyncio.sleep(1.0)
                     continue
-                if status != "done":
-                    return None
+                if status != "done": return None
                 dl_url = data.get("link")
                 fmt = data.get("format", "mp4")
                 out_path = f"{DOWNLOAD_DIR}/{vid}.{fmt}"
                 return await download_file(dl_url, out_path)
-    except Exception:
-        return None
+    except: return None
 
 
 def get_final_path_from_info(info: Dict) -> Optional[str]:
     vid = info.get("id")
-    if not vid:
-        return None
+    if not vid: return None
     ext = info.get("ext")
     if ext:
         p = f"{DOWNLOAD_DIR}/{vid}.{ext}"
-        if os.path.exists(p):
-            return p
-    matches = sorted(
-        glob.glob(f"{DOWNLOAD_DIR}/{vid}.*"),
-        key=os.path.getmtime,
-        reverse=True,
-    )
+        if os.path.exists(p): return p
+    matches = sorted(glob.glob(f"{DOWNLOAD_DIR}/{vid}.*"), key=os.path.getmtime, reverse=True)
     return matches[0] if matches else None
 
 
@@ -245,23 +226,19 @@ def download_with_ytdlp_sync(link: str, fmt: str) -> Optional[str]:
         opts["format"] = fmt
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(link, download=False)
-            if path := get_final_path_from_info(info):
-                return path
+            if path := get_final_path_from_info(info): return path
             ydl.download([link])
             return get_final_path_from_info(info)
-    except Exception:
-        return None
+    except: return None
 
 
 async def run_with_semaphore(coro):
-    async with SEM:
-        return await coro
+    async with SEM: return await coro
 
 
 async def deduplicate_download(key: str, runner):
     async with _inflight_lock:
-        if fut := _inflight.get(key):
-            return await fut
+        if fut := _inflight.get(key): return await fut
         fut = asyncio.get_running_loop().create_future()
         _inflight[key] = fut
     try:
@@ -272,35 +249,28 @@ async def deduplicate_download(key: str, runner):
         fut.set_exception(e)
         return None
     finally:
-        async with _inflight_lock:
-            _inflight.pop(key, None)
+        async with _inflight_lock: _inflight.pop(key, None)
 
 
 async def race_ytdlp_and_api(yt_task, api_task, title: str):
-    done, pending = await asyncio.wait(
-        {yt_task, api_task}, return_when=asyncio.FIRST_COMPLETED
-    )
+    done, pending = await asyncio.wait({yt_task, api_task}, return_when=asyncio.FIRST_COMPLETED)
     for task in done:
         result = task.result()
         if result and os.path.exists(result):
-            source = "Aria2 (Alexa Mode) ⚡" if task is yt_task else "API"
+            source = "Engine Core (High Speed)" if task is yt_task else "External API"
             log_download_source(title, source)
             for p in pending:
                 p.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await p
+                with contextlib.suppress(asyncio.CancelledError): await p
             return result
     for task in pending:
         try:
             result = await task
             if result and os.path.exists(result):
-                source = "Aria2 (Alexa Mode) ⚡" if task is yt_task else "API"
+                source = "Engine Core (High Speed)" if task is yt_task else "External API"
                 log_download_source(title, source)
                 return result
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            pass
+        except: pass
     return None
 
 
@@ -308,14 +278,13 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
     loop = asyncio.get_running_loop()
     vid = extract_video_id(link)
     if cached := find_cached_file(vid):
-        if title:
-            LOGGER.info(f"Track '{title}' - Served from cache")
+        if title: LOGGER.info(f"Track '{title}' - Served from cache")
         return cached
 
     if type == "audio":
         key = f"audio:{link}"
         async def run():
-            # Fallback formats to avoid errors
+            # Robust Audio Format
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
                     loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestaudio[ext=m4a]/bestaudio/best")
@@ -325,26 +294,24 @@ async def yt_dlp_download(link: str, type: str, title: str = "") -> Optional[str
             if api_task:
                 return await race_ytdlp_and_api(ytdlp_task, api_task, title or "Unknown")
             result = await ytdlp_task
-            if result and title:
-                log_download_source(title, "Aria2 (Alexa Mode) ⚡")
+            if result and title: log_download_source(title, "Engine Core (High Speed)")
             return result
         return await deduplicate_download(key, run)
 
     elif type == "video":
         key = f"video:{link}"
         async def run():
-            # Fallback formats to avoid errors
+            # Smart Video Format Chain (Same as YouTube Core)
             ytdlp_task = asyncio.create_task(
                 run_with_semaphore(
-                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "bestvideo[height<=720]+bestaudio/best[height<=720]/best")
+                    loop.run_in_executor(None, download_with_ytdlp_sync, link, "best[height<=720][ext=mp4]/bestvideo[height<=720]+bestaudio/best[height<=720]/best")
                 )
             )
             api_task = asyncio.create_task(api_download_video(link)) if USE_VIDEO_API else None
             if api_task:
                 return await race_ytdlp_and_api(ytdlp_task, api_task, title or "Unknown")
             result = await ytdlp_task
-            if result and title:
-                log_download_source(title, "Aria2 (Alexa Mode) ⚡")
+            if result and title: log_download_source(title, "Engine Core (High Speed)")
             return result
         return await deduplicate_download(key, run)
 
