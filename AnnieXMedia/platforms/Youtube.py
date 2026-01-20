@@ -1,8 +1,7 @@
 # ==============================================================================
-#  TITANIUM FUSION (ULTIMATE EDITION) © 2026
-#  1. Hyper-Speed (iPad Pro + Aria2 2.6Gbps)
-#  2. Auto-Fallback to Interactive OAuth2 (Login Link)
-#  3. Fixed Syntax & Full Logging
+#  TITANIUM ULTIMATE (MULTI-CLIENT ROTATION) © 2026
+#  Clients: iPad -> Studio (Creator) -> Android -> TV
+#  Strategy: Adaptive Formats + 2.6Gbps Aria2
 # ==============================================================================
 
 import asyncio
@@ -28,8 +27,7 @@ logging.basicConfig(
     format="[%(asctime)s] %(levelname)s: %(message)s",
     datefmt="%H:%M:%S"
 )
-# مهم جداً: تفعيل INFO عشان نشوف كود التحقق بتاع جوجل
-logging.getLogger("yt_dlp").setLevel(logging.INFO)
+logging.getLogger("yt_dlp").setLevel(logging.WARNING)
 
 try:
     from AnnieXMedia.utils.formatters import time_to_seconds
@@ -41,10 +39,9 @@ except ImportError:
 
 class SystemConfig:
     DOWNLOAD_PATH = os.path.abspath("downloads")
-    CACHE_PATH = os.path.abspath("auth_cache") # مجلد لحفظ تسجيل الدخول
     MAX_WORKERS = 16
     
-    # إعدادات السرعة القصوى (2.6 Gbps)
+    # إعدادات السرعة القصوى (Aria2)
     ARIA2_ARGS = [
         "-c", "-x", "16", "-s", "16", "-j", "64", "-k", "10M",
         "--min-split-size=10M", "--file-allocation=none", 
@@ -53,8 +50,6 @@ class SystemConfig:
 
 if not os.path.exists(SystemConfig.DOWNLOAD_PATH):
     os.makedirs(SystemConfig.DOWNLOAD_PATH)
-if not os.path.exists(SystemConfig.CACHE_PATH):
-    os.makedirs(SystemConfig.CACHE_PATH)
 
 _meta_cache: Dict[str, Tuple[float, Dict]] = {}
 _meta_lock = asyncio.Lock()
@@ -81,12 +76,12 @@ def get_cookie_file() -> Optional[str]:
     paths = ["cookies.txt", "AnnieXMedia/cookies.txt", "cookies/cookies.txt"]
     for path in paths:
         if os.path.exists(path) and os.path.getsize(path) > 0:
-            LOGGER("Auth").info(f"🍪 Found Cookie: {path}")
+            LOGGER("Auth").info(f"🍪 Secured: {path}")
             return os.path.abspath(path)
     return None
 
 # ------------------------------------------------------------------------------
-#  TITANIUM ENGINE
+#  THE ENGINE
 # ------------------------------------------------------------------------------
 
 class YouTubeAPI:
@@ -97,7 +92,7 @@ class YouTubeAPI:
         self.cookie = get_cookie_file()
         self.proxy = get_formatted_proxy()
         
-        LOGGER("Core").info(f"🚀 TITANIUM FUSION: ONLINE | Aria2: {self.has_aria2}")
+        LOGGER("Core").info(f"🚀 TITANIUM ULTIMATE: ACTIVE | Multi-Client Rotation")
 
     def _sanitize_link(self, link: str, videoid: Union[str, bool, None] = None) -> str:
         if isinstance(videoid, str) and videoid.strip():
@@ -122,79 +117,88 @@ class YouTubeAPI:
         except:
             vid_id = str(int(time.time()))
 
+        # Check Cache
         for f in os.listdir(SystemConfig.DOWNLOAD_PATH):
             if f.startswith(vid_id):
                 return os.path.join(SystemConfig.DOWNLOAD_PATH, f), True
 
         # ======================================================================
-        #  STRATEGY A: SPEED (iPad Pro)
+        #  GLOBAL CONFIGURATION
         # ======================================================================
-        ipad_opts = {
+        base_opts = {
             "outtmpl": os.path.join(SystemConfig.DOWNLOAD_PATH, f"{vid_id}.%(ext)s"),
             "cookiefile": self.cookie,
             "proxy": self.proxy,
-            "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-            "extractor_args": {"youtube": {"player_client": ["ios", "web"], "skip": ["dash", "hls"]}},
-            "external_downloader": "aria2c" if self.has_aria2 else None,
-            "external_downloader_args": SystemConfig.ARIA2_ARGS if self.has_aria2 else None,
-            "prefer_ffmpeg": False,
-            "keepvideo": True,
             "geo_bypass": True,
             "nocheckcertificate": True,
-            "quiet": True, # Silent for speed
+            "quiet": True,
             "ignoreerrors": True,
-            "retries": 5,
+            # Aria2 Speed
+            "external_downloader": "aria2c" if self.has_aria2 else None,
+            "external_downloader_args": SystemConfig.ARIA2_ARGS if self.has_aria2 else None,
         }
 
         # ======================================================================
-        #  STRATEGY B: AUTH/RECOVERY (PC + OAuth2)
+        #  SMART FORMATS (No Hard-coding)
         # ======================================================================
-        pc_oauth_opts = {
-            "outtmpl": os.path.join(SystemConfig.DOWNLOAD_PATH, f"{vid_id}.%(ext)s"),
-            # --- تفعيل طلب كود التحقق ---
-            "username": "oauth2",
-            "password": "",
-            "cachedir": SystemConfig.CACHE_PATH,
-            
-            "cookiefile": self.cookie,
-            "proxy": self.proxy, # جرب بالبروكسي الأول
-            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "extractor_args": {"youtube": {"player_client": ["web"]}},
-            "quiet": False, # لازم نشوف اللوج عشان الكود
-            "ignoreerrors": True,
-        }
-
         if video:
-            ipad_opts["format"] = pc_oauth_opts["format"] = "bestvideo+bestaudio/best"
-            ipad_opts["merge_output_format"] = pc_oauth_opts["merge_output_format"] = "mp4"
+            base_opts["format"] = "bestvideo+bestaudio/best"
+            base_opts["merge_output_format"] = "mp4"
         else:
-            ipad_opts["format"] = pc_oauth_opts["format"] = "bestaudio/best"
+            # الأولوية: M4A > MP3 > أي حاجة تانية
+            base_opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best"
+            base_opts["postprocessors"] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]
 
-        def _execute_fusion():
-            # 1. Try iPad Speed First
+        def _execute_dl():
+            # --- المحاولة 1: iPad Pro (السرعة) ---
             try:
-                LOGGER("Fusion").info("⚡ Attempting High-Speed Download (iPad)...")
-                with yt_dlp.YoutubeDL(ipad_opts) as ydl:
-                    ydl.download([link])
+                LOGGER("Titanium").info("⚡ Trying Client: iPad Pro...")
+                opts = base_opts.copy()
+                opts["extractor_args"] = {"youtube": {"player_client": ["ios", "web"]}}
+                opts["user_agent"] = "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+                
+                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
                 if self._check_file(vid_id): return self._check_file(vid_id)
-            except Exception as e:
-                LOGGER("Fusion").warning(f"Speed failed: {e}")
+            except Exception: pass
 
-            # 2. Try PC + OAuth (The Fixer)
+            # --- المحاولة 2: Android Creator (الاستوديو) ---
             try:
-                LOGGER("Fusion").info("🔐 Switching to OAuth Mode. CHECK LOGS FOR CODE if requested!")
-                # لو البروكسي كان سبب المشكلة، ممكن نشيله هنا
-                # if pc_oauth_opts.get("proxy"): pc_oauth_opts["proxy"] = None 
-
-                with yt_dlp.YoutubeDL(pc_oauth_opts) as ydl:
-                    ydl.download([link])
+                LOGGER("Titanium").info("🛡️ Trying Client: Studio (Creator)...")
+                opts = base_opts.copy()
+                opts["extractor_args"] = {"youtube": {"player_client": ["android_creator"]}}
+                opts["user_agent"] = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
+                
+                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
                 if self._check_file(vid_id): return self._check_file(vid_id)
-            except Exception as e:
-                LOGGER("Fusion").error(f"OAuth failed: {e}")
+            except Exception: pass
+
+            # --- المحاولة 3: Android Standard (القياسي) ---
+            try:
+                LOGGER("Titanium").info("📱 Trying Client: Android Standard...")
+                opts = base_opts.copy()
+                opts["extractor_args"] = {"youtube": {"player_client": ["android"]}}
+                
+                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
+                if self._check_file(vid_id): return self._check_file(vid_id)
+            except Exception: pass
+
+            # --- المحاولة 4: TV (الحل الأخير) ---
+            try:
+                LOGGER("Titanium").info("📺 Trying Client: TV Mode...")
+                opts = base_opts.copy()
+                opts["extractor_args"] = {"youtube": {"player_client": ["tv"]}}
+                
+                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
+                if self._check_file(vid_id): return self._check_file(vid_id)
+            except Exception: pass
 
             return None
 
-        downloaded_file = await loop.run_in_executor(self.pool, _execute_fusion)
+        downloaded_file = await loop.run_in_executor(self.pool, _execute_dl)
         if downloaded_file: return downloaded_file, True
         return None, None
 
@@ -228,6 +232,7 @@ class YouTubeAPI:
     async def playlist(self, link: str, limit: int, user_id, videoid: Union[str, bool, None] = None) -> List[str]:
         if videoid: link = f"https://youtube.com/playlist?list={videoid}"
         cmd = ["yt-dlp", "--flat-playlist", "--get-id", "--playlist-end", str(limit), "--ignore-errors", "--no-warnings", 
+               # iPad User Agent for Playlist
                "--user-agent", "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
                link]
         if self.cookie: cmd.extend(["--cookies", self.cookie])
@@ -243,15 +248,12 @@ class YouTubeAPI:
     async def formats(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[List[Dict], str]:
         link = self._sanitize_link(link, videoid)
         opts = {"quiet": True, "cookiefile": self.cookie}
-        
-        # --- FIXED SYNTAX HERE ---
         def _get():
             try:
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     return ydl.extract_info(link, download=False).get("formats", [])
             except:
                 return []
-                
         loop = asyncio.get_running_loop()
         raw_formats = await loop.run_in_executor(self.pool, _get)
         out = []
