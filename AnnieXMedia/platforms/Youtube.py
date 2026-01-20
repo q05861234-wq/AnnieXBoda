@@ -1,7 +1,7 @@
 # ==============================================================================
-#  HIGH-PERFORMANCE ENTERPRISE ENGINE © 2025
-#  Base: Stable Legacy Core | Boost: S25 Ultra + Aria2 (16x)
-#  Features: Robust Playlist | Anti-Crash Formats
+#  HIGH-FIDELITY ENTERPRISE ENGINE © 2025
+#  Focus: Maximum Audio/Video Quality | S25 Ultra Spoofing | Aria2 Turbo
+#  Prioritizes: 1080p+ & High Bitrate Audio
 # ==============================================================================
 
 import asyncio
@@ -25,7 +25,6 @@ from youtubesearchpython.aio import VideosSearch, Playlist
 #  SECTION 1: ENVIRONMENT & LOGGING
 # ==============================================================================
 
-# Safe Logging Setup
 logging.basicConfig(level=logging.ERROR)
 def LOGGER(name): return logging.getLogger(name)
 
@@ -33,24 +32,22 @@ try:
     from AnnieXMedia.utils.database import is_on_off
     from AnnieXMedia.utils.formatters import time_to_seconds
     from AnnieXMedia.utils.tuning import YTDLP_TIMEOUT, YOUTUBE_META_MAX, YOUTUBE_META_TTL
-    # Try importing global logger if available, else use local
     from AnnieXMedia import LOGGER as GLOBAL_LOGGER
     def LOGGER(name): return GLOBAL_LOGGER(name)
 except ImportError:
-    # Fallback config
     async def is_on_off(x): return True
     def time_to_seconds(t): return 0
     YTDLP_TIMEOUT = 300
     YOUTUBE_META_MAX = 5000
     YOUTUBE_META_TTL = 3600
 
-# Silence unnecessary logs
+# Silence Logs
 logging.getLogger("yt_dlp").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 # ==============================================================================
-#  SECTION 2: MEMORY CACHING
+#  SECTION 2: CACHING SYSTEM
 # ==============================================================================
 
 _meta_cache: Dict[str, Tuple[float, Dict]] = {}
@@ -65,28 +62,26 @@ async def _clean_cache():
             for k in keys: del _meta_cache[k]
 
 # ==============================================================================
-#  SECTION 3: SYSTEM CONFIGURATION (THE SPEED BOOST)
+#  SECTION 3: CONFIGURATION (QUALITY FOCUSED)
 # ==============================================================================
 
 class SystemConfig:
     DOWNLOAD_PATH = os.path.abspath("downloads")
-    # Smart Worker Calculation
     MAX_WORKERS = (os.cpu_count() or 4) * 4
     
-    # === ARIA2: TURBO SETTINGS (16x) ===
+    # Aria2 Settings (Balanced for Stability with Large Files)
     ARIA2_ARGS = [
         "-c", "-x", "16", "-s", "16", "-j", "32", "-k", "1M",
-        "--buffer-size=1024M",      # 1GB Buffer
-        "--file-allocation=none",   # Instant Allocation
+        "--buffer-size=1024M", 
+        "--file-allocation=none",
         "--max-connection-per-server=16",
         "--quiet=true"
     ]
     
-    # === S25 ULTRA AGENTS (PRIORITY TRAFFIC) ===
     USER_AGENTS = [
         "Mozilla/5.0 (Linux; Android 15; SM-S938B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36",
         "Mozilla/5.0 (Linux; Android 15; SM-S938U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36",
-        "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.144 Mobile Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     ]
 
 if not os.path.exists(SystemConfig.DOWNLOAD_PATH):
@@ -126,7 +121,7 @@ class YouTubeAPI:
         self.has_aria2 = shutil.which("aria2c") is not None
         
         if self.has_aria2:
-            LOGGER("Core").info("Enterprise Engine: S25 Ultra + Aria2 (16x) Active")
+            LOGGER("Core").info("Enterprise Engine: Best Quality Mode + Aria2 Active")
 
     def _sanitize_link(self, link: str, videoid: Union[str, bool, None] = None) -> str:
         if isinstance(videoid, str) and videoid.strip():
@@ -157,7 +152,7 @@ class YouTubeAPI:
                 if match: return match.group(0)
         return None
 
-    # --- METADATA (STABLE HYBRID) ---
+    # --- METADATA ---
     async def track(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[Dict, str]:
         prepared_link = self._sanitize_link(link, videoid)
         
@@ -169,7 +164,6 @@ class YouTubeAPI:
                 else:
                     del _meta_cache[prepared_link]
 
-        # 1. Try Fast (VideosSearch)
         try:
             search = VideosSearch(prepared_link, limit=1)
             res = await search.next()
@@ -190,10 +184,9 @@ class YouTubeAPI:
             
             async with _meta_lock:
                 _meta_cache[prepared_link] = (time.time(), {'details': details, 'vidid': vid_id})
-                
+            
             if len(_meta_cache) % 100 == 0: asyncio.create_task(_clean_cache())
             return details, vid_id
-
         except:
              return {"title": "Error", "link": prepared_link, "vidid": "error", "duration_min": "0:00", "thumb": ""}, "error"
 
@@ -214,7 +207,7 @@ class YouTubeAPI:
         d, _ = await self.track(link, videoid)
         return d.get("thumb", "")
 
-    # --- DOWNLOADER (STABLE FORMATS + HIGH SPEED) ---
+    # --- DOWNLOADER (HIGHEST QUALITY LOGIC) ---
     async def download(
         self, link: str, mystic, *, video: Union[bool, str, None] = None, videoid: Union[str, bool, None] = None,
     ) -> Union[Tuple[str, Optional[bool]], Tuple[None, None]]:
@@ -233,18 +226,18 @@ class YouTubeAPI:
 
         if os.path.exists(final_path): return final_path, True
 
-        # === HYBRID CONFIGURATION ===
+        # === QUALITY CONFIGURATION ===
         opts = {
             "outtmpl": final_path,
             "cookiefile": get_cookie_file(),
             "geo_bypass": True, "nocheckcertificate": True,
             "quiet": True, "no_warnings": True, "ignoreerrors": True,
             "force_ipv4": True,
-            "user_agent": random.choice(SystemConfig.USER_AGENTS), # S25 Spoof
+            "user_agent": random.choice(SystemConfig.USER_AGENTS),
             "socket_timeout": 30,
             "retries": 5,
-            
-            # S25 Ultra Optimization
+            # Prefer ffmpeg to merge best audio + best video
+            "prefer_ffmpeg": True,
             "extractor_args": {
                 'youtube': {
                     'skip': ['dash', 'hls'], 
@@ -253,17 +246,26 @@ class YouTubeAPI:
             },
         }
 
-        # === THE FIX: FAIL-SAFE FORMAT SELECTION ===
-        # This solves "Requested format not available" by providing fallbacks
+        # === THE QUALITY BOOST ===
         if video:
-            # 1. Try Pre-merged MP4 (Fastest) <= 720p
-            # 2. OR Merge Video+Audio <= 720p (Reliable)
-            # 3. OR Fallback to ANY Best (Last Resort - Never fails)
-            opts["format"] = "best[height<=720][ext=mp4]/bestvideo[height<=720]+bestaudio/best"
+            # 1. Best Video (Up to 1080p) + Best Audio -> Merged to MP4
+            # 2. Fallback: Best (Up to 720p) if 1080p fails/too slow
+            # 3. Last Resort: Anything available
+            opts["format"] = (
+                "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/"  # Target: 1080p High
+                "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/"   # Target: 720p HD
+                "best[ext=mp4]/best"                                    # Fallback
+            )
         else:
+            # 1. Best Audio (M4A/AAC) with highest bitrate
+            # 2. Fallback to any audio converted to M4A
             opts["format"] = "bestaudio[ext=m4a]/bestaudio"
+            opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "m4a",
+                "preferredquality": "192",  # Force High Quality Audio
+            }]
 
-        # Aria2 Injection
         if self.has_aria2:
             opts["external_downloader"] = "aria2c"
             opts["external_downloader_args"] = SystemConfig.ARIA2_ARGS
@@ -275,18 +277,24 @@ class YouTubeAPI:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 try: ydl.download([link])
                 except Exception as e: LOGGER("DL").error(f"DL Error: {e}")
-            return final_path if os.path.exists(final_path) else None
+            
+            # Check for file existence (sometimes ext changes after merge)
+            possible_files = [f for f in os.listdir(SystemConfig.DOWNLOAD_PATH) if f.startswith(vid_id)]
+            if possible_files:
+                return os.path.join(SystemConfig.DOWNLOAD_PATH, possible_files[0])
+            return None
 
         downloaded_file = await loop.run_in_executor(self.pool, _execute_dl)
         if downloaded_file: return downloaded_file, True
         return None, None
 
-    # --- UTILS & PLAYLIST ---
+    # --- UTILS ---
     async def video_stream_url(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[int, str]:
         link = self._sanitize_link(link, videoid)
         cookie = get_cookie_file()
         cookies_arg = ["--cookies", cookie] if cookie else []
-        stdout, stderr = await _exec_shell("yt-dlp", *cookies_arg, "-g", "-f", "best[height<=?720][width<=?1280]", link)
+        # Try to get 1080p stream if possible, fallback to 720p
+        stdout, stderr = await _exec_shell("yt-dlp", *cookies_arg, "-g", "-f", "best[height<=?1080]", link)
         return (1, stdout.decode().split("\n")[0]) if stdout else (0, stderr.decode())
     video = video_stream_url 
 
@@ -294,14 +302,12 @@ class YouTubeAPI:
         if videoid: link = self.playlist_url + str(videoid)
         link = self._sanitize_link(link).split("&")[0]
 
-        # 1. Try Library (Fastest)
         try:
             plist = await Playlist.get(link)
             if plist and plist.get("videos"):
                  return [video["id"] for video in plist["videos"][:limit] if video.get("id")]
         except: pass
 
-        # 2. Try Flat Dump (Reliable for Huge Lists)
         cookie = get_cookie_file()
         cookies_arg = ["--cookies", cookie] if cookie else []
         stdout, _ = await _exec_shell(
