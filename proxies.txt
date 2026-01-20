@@ -1,0 +1,10 @@
+142.111.48.253:7030:cdntbcvj:oymzchzgycvk
+23.95.150.145:6114:cdntbcvj:oymzchzgycvk
+198.23.239.134:6540:cdntbcvj:oymzchzgycvk
+107.172.163.27:6543:cdntbcvj:oymzchzgycvk
+198.105.121.200:6462:cdntbcvj:oymzchzgycvk
+64.137.96.74:6641:cdntbcvj:oymzchzgycvk
+84.247.60.125:6095:cdntbcvj:oymzchzgycvk
+216.10.27.159:6837:cdntbcvj:oymzchzgycvk
+23.26.71.145:5628:cdntbcvj:oymzchzgycvk
+23.27.208.120:5830:cdntbcvj:oymzchzgycvk
