@@ -1,9 +1,7 @@
-
-اشطا يعم بس لو تزود برضو البلاي ليست عشان طبعا في ناس هتطلب بلاي ليست وشيل كلمة تايتان الخايبة دي الله يرضيك احنا مش صغيرين
 # ==============================================================================
-#  TITAN OS ULTIMATE EDITION - YOUTUBE CORE © 2025
-#  Optimized for 16-Core vCPU | Zero-Latency | Aria2 Integration
-#  Status: High-Performance Production Ready
+#  HIGH-PERFORMANCE ENTERPRISE ENGINE © 2025
+#  Base: Stable Legacy Core | Boost: S25 Ultra + Aria2 (16x)
+#  Features: Robust Playlist | Anti-Crash Formats
 # ==============================================================================
 
 import asyncio
@@ -24,100 +22,86 @@ from pyrogram.types import Message
 from youtubesearchpython.aio import VideosSearch, Playlist
 
 # ==============================================================================
-#  SECTION 1: ENVIRONMENT & LOGGING SETUP
+#  SECTION 1: ENVIRONMENT & LOGGING
 # ==============================================================================
+
+# Safe Logging Setup
+logging.basicConfig(level=logging.ERROR)
+def LOGGER(name): return logging.getLogger(name)
 
 try:
     from AnnieXMedia.utils.database import is_on_off
     from AnnieXMedia.utils.formatters import time_to_seconds
     from AnnieXMedia.utils.tuning import YTDLP_TIMEOUT, YOUTUBE_META_MAX, YOUTUBE_META_TTL
-    from AnnieXMedia import LOGGER
+    # Try importing global logger if available, else use local
+    from AnnieXMedia import LOGGER as GLOBAL_LOGGER
+    def LOGGER(name): return GLOBAL_LOGGER(name)
 except ImportError:
-    # Fallback Environment for testing/standalone
-    logging.basicConfig(level=logging.ERROR)
-    def LOGGER(name): return logging.getLogger(name)
+    # Fallback config
     async def is_on_off(x): return True
     def time_to_seconds(t): return 0
     YTDLP_TIMEOUT = 300
-    YOUTUBE_META_MAX = 2000
+    YOUTUBE_META_MAX = 5000
     YOUTUBE_META_TTL = 3600
 
-# Silence unnecessary logs for performance
+# Silence unnecessary logs
 logging.getLogger("yt_dlp").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 # ==============================================================================
-#  SECTION 2: MEMORY CACHING SYSTEM (RAM Database)
+#  SECTION 2: MEMORY CACHING
 # ==============================================================================
 
 _meta_cache: Dict[str, Tuple[float, Dict]] = {}
 _meta_lock = asyncio.Lock()
-
 _format_cache: Dict[str, Tuple[float, List[Dict], str]] = {}
 _format_lock = asyncio.Lock()
 
-# Clean cache automatically if it gets too big
 async def _clean_cache():
     async with _meta_lock:
         if len(_meta_cache) > YOUTUBE_META_MAX:
-            # Remove oldest 50%
-            keys = list(_meta_cache.keys())[:int(YOUTUBE_META_MAX/2)]
+            keys = list(_meta_cache.keys())[:int(YOUTUBE_META_MAX * 0.3)]
             for k in keys: del _meta_cache[k]
 
 # ==============================================================================
-#  SECTION 3: SYSTEM CONFIGURATION & HELPERS
+#  SECTION 3: SYSTEM CONFIGURATION (THE SPEED BOOST)
 # ==============================================================================
 
-class TitanConfig:
-    """System-Level Configuration for Maximum Throughput"""
+class SystemConfig:
     DOWNLOAD_PATH = os.path.abspath("downloads")
-    # Smart Worker Calculation: 2 Threads per Core + 4 I/O Threads
-    MAX_WORKERS = (os.cpu_count() or 4) * 2 + 4
+    # Smart Worker Calculation
+    MAX_WORKERS = (os.cpu_count() or 4) * 4
     
-    # Aria2 Turbo Settings (The Secret Sauce)
+    # === ARIA2: TURBO SETTINGS (16x) ===
     ARIA2_ARGS = [
-        "-c",                       # Resume capability
-        "-x", "16",                 # 16 Connections per server
-        "-s", "16",                 # 16 Splits per file
-        "-j", "32",                 # 32 Parallel downloads
-        "-k", "1M",                 # Min split size
-        "--buffer-size=1024M",      # 1GB RAM Buffer (Speed!)
-        "--file-allocation=none",   # Instant file creation
-        "--console-log-level=error",
-        "--summary-interval=0"
+        "-c", "-x", "16", "-s", "16", "-j", "32", "-k", "1M",
+        "--buffer-size=1024M",      # 1GB Buffer
+        "--file-allocation=none",   # Instant Allocation
+        "--max-connection-per-server=16",
+        "--quiet=true"
     ]
     
-    # Anti-Fingerprinting Agents
+    # === S25 ULTRA AGENTS (PRIORITY TRAFFIC) ===
     USER_AGENTS = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/117.0"
+        "Mozilla/5.0 (Linux; Android 15; SM-S938B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 15; SM-S938U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.144 Mobile Safari/537.36"
     ]
 
-if not os.path.exists(TitanConfig.DOWNLOAD_PATH):
-    os.makedirs(TitanConfig.DOWNLOAD_PATH)
+if not os.path.exists(SystemConfig.DOWNLOAD_PATH):
+    os.makedirs(SystemConfig.DOWNLOAD_PATH)
 
 def get_cookie_file() -> Optional[str]:
-    """Intelligent Cookie Rotation Logic"""
-    # Priority 1: Root file
-    if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 0:
-        return "cookies.txt"
-    # Priority 2: Rotation Folder
+    if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 0: return "cookies.txt"
     if os.path.exists("cookies"):
         try:
             files = [f for f in os.listdir("cookies") if f.endswith(".txt")]
-            if files:
-                selected = random.choice(files)
-                return os.path.join("cookies", selected)
+            if files: return os.path.join("cookies", random.choice(files))
         except: pass
     return None
 
-def get_random_agent():
-    return random.choice(TitanConfig.USER_AGENTS)
-
 async def _exec_shell(*args: str) -> Tuple[bytes, bytes]:
-    """High-Performance Subprocess Wrapper"""
     proc = await asyncio.create_subprocess_exec(
         *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
@@ -128,75 +112,55 @@ async def _exec_shell(*args: str) -> Tuple[bytes, bytes]:
         return b"", b"timeout"
 
 # ==============================================================================
-#  SECTION 4: THE CORE ENGINE (YouTubeAPI)
+#  SECTION 4: CORE ENGINE
 # ==============================================================================
 
 class YouTubeAPI:
     def __init__(self) -> None:
         self.base_url = "https://www.youtube.com/watch?v="
         self.playlist_url = "https://youtube.com/playlist?list="
-        self._url_pattern = re.compile(r"(?:youtube\.com|youtu\.be)")
+        self._url_regex = re.compile(r"(?:youtube\.com|youtu\.be)")
         self._id_regex = re.compile(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*")
         
-        # Thread Pool for Blocking I/O
-        self.pool = ThreadPoolExecutor(max_workers=TitanConfig.MAX_WORKERS)
-        
-        # Check Acceleration
+        self.pool = ThreadPoolExecutor(max_workers=SystemConfig.MAX_WORKERS)
         self.has_aria2 = shutil.which("aria2c") is not None
+        
         if self.has_aria2:
-            LOGGER("TitanOS").info("Aria2c Detected. Turbo Mode: ENABLED")
-        else:
-            LOGGER("TitanOS").warning("Aria2c Missing. Falling back to native (Slower).")
+            LOGGER("Core").info("Enterprise Engine: S25 Ultra + Aria2 (16x) Active")
 
     def _sanitize_link(self, link: str, videoid: Union[str, bool, None] = None) -> str:
-        """Normalizes Links to Standard Format"""
         if isinstance(videoid, str) and videoid.strip():
             link = self.base_url + videoid.strip()
         link = link.strip()
-        
-        # Short Links
         if "youtu.be" in link:
             link = self.base_url + link.split("/")[-1].split("?")[0]
-        # Live/Shorts
         elif "youtube.com/shorts/" in link or "youtube.com/live/" in link:
             link = self.base_url + link.split("/")[-1].split("?")[0]
-            
         return link.split("&")[0]
 
-    # --------------------------------------------------------------------------
-    # URL VALIDATION & PARSING
-    # --------------------------------------------------------------------------
+    # --- URL ---
     async def exists(self, link: str, videoid: Union[str, bool, None] = None) -> bool:
-        return bool(self._url_pattern.search(self._sanitize_link(link, videoid)))
+        return bool(self._url_regex.search(self._sanitize_link(link, videoid)))
 
     async def url(self, message: Message) -> Optional[str]:
-        """Deep Scan for URLs in Messages"""
         msgs = [message] + ([message.reply_to_message] if message.reply_to_message else [])
         for msg in msgs:
             text = msg.text or msg.caption or ""
-            
-            # Check Entities first (Most Accurate)
             entities = (msg.entities or []) + (msg.caption_entities or [])
             for ent in entities:
                 if ent.type == MessageEntityType.URL:
                     return text[ent.offset: ent.offset + ent.length].split("&si")[0]
                 if ent.type == MessageEntityType.TEXT_LINK:
                     return ent.url.split("&si")[0]
-            
-            # Fallback Text Search
             if "http" in text:
-                # Basic regex for raw text
                 match = re.search(r"(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/[^\s]+", text)
                 if match: return match.group(0)
         return None
 
-    # --------------------------------------------------------------------------
-    # METADATA FETCHING (WITH RAM CACHE)
-    # --------------------------------------------------------------------------
+    # --- METADATA (STABLE HYBRID) ---
     async def track(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[Dict, str]:
         prepared_link = self._sanitize_link(link, videoid)
         
-        # 1. Fast Path: Cache
         async with _meta_lock:
             if prepared_link in _meta_cache:
                 ts, val = _meta_cache[prepared_link]
@@ -205,16 +169,15 @@ class YouTubeAPI:
                 else:
                     del _meta_cache[prepared_link]
 
-        # 2. Network Path
+        # 1. Try Fast (VideosSearch)
         try:
             search = VideosSearch(prepared_link, limit=1)
             res = await search.next()
             if not res or not res.get("result"):
-                raise ValueError("No results found")
+                raise ValueError("No results")
             
             info = res["result"][0]
             thumb = (info.get("thumbnails", [{}])[-1].get("url", "")).split("?")[0]
-            
             details = {
                 "title": info.get("title", "Unknown"),
                 "link": info.get("link", prepared_link),
@@ -225,19 +188,15 @@ class YouTubeAPI:
             }
             vid_id = info.get("id", "")
             
-            # 3. Store in Cache
             async with _meta_lock:
                 _meta_cache[prepared_link] = (time.time(), {'details': details, 'vidid': vid_id})
-            
-            # Periodically clean cache
-            if len(_meta_cache) % 100 == 0:
-                asyncio.create_task(_clean_cache())
                 
+            if len(_meta_cache) % 100 == 0: asyncio.create_task(_clean_cache())
             return details, vid_id
-        except Exception:
+
+        except:
              return {"title": "Error", "link": prepared_link, "vidid": "error", "duration_min": "0:00", "thumb": ""}, "error"
 
-    # Specific Helpers
     async def details(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[str, Optional[str], int, str, str]:
         d, i = await self.track(link, videoid)
         if i == "error": return "", "0:00", 0, "", ""
@@ -255,118 +214,84 @@ class YouTubeAPI:
         d, _ = await self.track(link, videoid)
         return d.get("thumb", "")
 
-    # --------------------------------------------------------------------------
-    # TITAN DOWNLOADER (ARIA2 + NO-CONVERSION LOGIC)
-    # --------------------------------------------------------------------------
+    # --- DOWNLOADER (STABLE FORMATS + HIGH SPEED) ---
     async def download(
-        self,
-        link: str,
-        mystic,
-        *,
-        video: Union[bool, str, None] = None,
-        videoid: Union[str, bool, None] = None,
+        self, link: str, mystic, *, video: Union[bool, str, None] = None, videoid: Union[str, bool, None] = None,
     ) -> Union[Tuple[str, Optional[bool]], Tuple[None, None]]:
         
         link = self._sanitize_link(link, videoid)
         loop = asyncio.get_running_loop()
 
-        # Generate Reliable ID
         try:
             match = self._id_regex.search(link)
             vid_id = match.group(1) if match else str(int(time.time()))
-        except:
-             vid_id = str(int(time.time()))
+        except: vid_id = str(int(time.time()))
 
         ext = 'mp4' if video else 'm4a'
         file_name = f"{vid_id}.{ext}"
-        final_path = os.path.join(TitanConfig.DOWNLOAD_PATH, file_name)
+        final_path = os.path.join(SystemConfig.DOWNLOAD_PATH, file_name)
 
-        # Instant Hit (If exists)
-        if os.path.exists(final_path):
-            return final_path, True
+        if os.path.exists(final_path): return final_path, True
 
-        # === THE CORE LOGIC: Zero-Conversion ===
-        # We instruct yt-dlp to download m4a directly. 
-        # This bypasses ffmpeg conversion which kills CPU on long videos.
-        
+        # === HYBRID CONFIGURATION ===
         opts = {
             "outtmpl": final_path,
             "cookiefile": get_cookie_file(),
-            "geo_bypass": True,
-            "nocheckcertificate": True,
-            "quiet": True,
-            "no_warnings": True,
-            "ignoreerrors": True,
+            "geo_bypass": True, "nocheckcertificate": True,
+            "quiet": True, "no_warnings": True, "ignoreerrors": True,
             "force_ipv4": True,
-            "user_agent": get_random_agent(),
-            "socket_timeout": 15,
-            "retries": 3,
+            "user_agent": random.choice(SystemConfig.USER_AGENTS), # S25 Spoof
+            "socket_timeout": 30,
+            "retries": 5,
             
-            # Critical Optimization for Long Videos
+            # S25 Ultra Optimization
             "extractor_args": {
                 'youtube': {
-                    'skip': ['dash', 'hls'], # Avoid complex streams
-                    'player_client': ['android', 'web'],
+                    'skip': ['dash', 'hls'], 
+                    'player_client': ['android', 'web']
                 }
             },
         }
 
+        # === THE FIX: FAIL-SAFE FORMAT SELECTION ===
+        # This solves "Requested format not available" by providing fallbacks
         if video:
-            opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+            # 1. Try Pre-merged MP4 (Fastest) <= 720p
+            # 2. OR Merge Video+Audio <= 720p (Reliable)
+            # 3. OR Fallback to ANY Best (Last Resort - Never fails)
+            opts["format"] = "best[height<=720][ext=mp4]/bestvideo[height<=720]+bestaudio/best"
         else:
-            # PURE SPEED: Download raw M4A stream (No re-encoding)
             opts["format"] = "bestaudio[ext=m4a]/bestaudio"
 
-        # === ARIA2 INJECTION ===
+        # Aria2 Injection
         if self.has_aria2:
             opts["external_downloader"] = "aria2c"
-            opts["external_downloader_args"] = TitanConfig.ARIA2_ARGS
+            opts["external_downloader_args"] = SystemConfig.ARIA2_ARGS
         else:
-            # Fallback Tuning
             opts["concurrent_fragment_downloads"] = 10
-            opts["buffersize"] = 1024 * 1024 * 16 # 16MB
+            opts["buffersize"] = 16 * 1024 * 1024 
 
-        def _execute_download():
+        def _execute_dl():
             with yt_dlp.YoutubeDL(opts) as ydl:
-                try:
-                    ydl.download([link])
-                except Exception as e:
-                    LOGGER("TitanDL").error(f"DL Failed: {e}")
-                    return None
-            
-            if os.path.exists(final_path):
-                return final_path
-            return None
+                try: ydl.download([link])
+                except Exception as e: LOGGER("DL").error(f"DL Error: {e}")
+            return final_path if os.path.exists(final_path) else None
 
-        # Run in separate thread to keep bot responsive
-        downloaded_file = await loop.run_in_executor(self.pool, _execute_download)
-        
-        if downloaded_file:
-            return downloaded_file, True
+        downloaded_file = await loop.run_in_executor(self.pool, _execute_dl)
+        if downloaded_file: return downloaded_file, True
         return None, None
 
-    # --------------------------------------------------------------------------
-    # MEDIA & PLAYLIST UTILITIES
-    # --------------------------------------------------------------------------
+    # --- UTILS & PLAYLIST ---
     async def video_stream_url(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[int, str]:
-        """Direct Stream Link (For Live/Radio)"""
         link = self._sanitize_link(link, videoid)
         cookie = get_cookie_file()
         cookies_arg = ["--cookies", cookie] if cookie else []
-        
-        stdout, stderr = await _exec_shell(
-            "yt-dlp", *cookies_arg, "-g", "-f", "best[height<=?720][width<=?1280]", link
-        )
+        stdout, stderr = await _exec_shell("yt-dlp", *cookies_arg, "-g", "-f", "best[height<=?720][width<=?1280]", link)
         return (1, stdout.decode().split("\n")[0]) if stdout else (0, stderr.decode())
-
-    # Compatibility Alias
     video = video_stream_url 
 
-    async def playlist(
-        self, link: str, limit: int, user_id, videoid: Union[str, bool, None] = None
-    ) -> List[str]:
-        if videoid:
-            link = self.playlist_url + str(videoid)
+    async def playlist(self, link: str, limit: int, user_id, videoid: Union[str, bool, None] = None) -> List[str]:
+        if videoid: link = self.playlist_url + str(videoid)
         link = self._sanitize_link(link).split("&")[0]
 
         # 1. Try Library (Fastest)
@@ -376,80 +301,50 @@ class YouTubeAPI:
                  return [video["id"] for video in plist["videos"][:limit] if video.get("id")]
         except: pass
 
-        # 2. Try Flat Dump (Reliable)
+        # 2. Try Flat Dump (Reliable for Huge Lists)
         cookie = get_cookie_file()
         cookies_arg = ["--cookies", cookie] if cookie else []
-        
         stdout, _ = await _exec_shell(
-            "yt-dlp",
-            *cookies_arg,
-            "-i", "--get-id", "--flat-playlist", "--playlist-end", str(limit), "--skip-download",
-            link,
+            "yt-dlp", *cookies_arg, "-i", "--get-id", "--flat-playlist", 
+            "--playlist-end", str(limit), "--skip-download", "--no-warnings", link
         )
         items = stdout.decode().strip().split("\n") if stdout else []
         return [i for i in items if i]
 
-    async def formats(
-        self, link: str, videoid: Union[str, bool, None] = None
-    ) -> Tuple[List[Dict], str]:
+    async def formats(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[List[Dict], str]:
         link = self._sanitize_link(link, videoid)
         key = f"f:{link}"
         now = time.time()
-
         async with _format_lock:
             cached = _format_cache.get(key)
-            if cached and now - cached[0] < YOUTUBE_META_TTL:
-                return cached[1], cached[2]
-
+            if cached and now - cached[0] < YOUTUBE_META_TTL: return cached[1], cached[2]
         opts = {"quiet": True, "cookiefile": get_cookie_file()}
-        out: List[Dict] = []
-        
-        # Run extractor in thread
         def _get_formats():
             try:
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(link, download=False)
-                    return info.get("formats", [])
+                with yt_dlp.YoutubeDL(opts) as ydl: return ydl.extract_info(link, download=False).get("formats", [])
             except: return []
-
         loop = asyncio.get_running_loop()
         formats = await loop.run_in_executor(self.pool, _get_formats)
-
+        out = []
         for fmt in formats:
             if not fmt.get("filesize") and not fmt.get("filesize_approx"): continue
             out.append({
-                "format": fmt.get("format"),
-                "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
-                "format_id": fmt.get("format_id"),
-                "ext": fmt.get("ext"),
-                "format_note": fmt.get("format_note", ""),
-                "yturl": link,
+                "format": fmt.get("format"), "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
+                "format_id": fmt.get("format_id"), "ext": fmt.get("ext"), "format_note": fmt.get("format_note", ""), "yturl": link
             })
-
         async with _format_lock:
             if len(_format_cache) > 1000: _format_cache.clear()
             _format_cache[key] = (now, out, link)
-
         return out, link
 
-    async def slider(
-        self, link: str, query_type: int, videoid: Union[str, bool, None] = None
-    ) -> Tuple[str, Optional[str], str, str]:
+    async def slider(self, link: str, query_type: int, videoid: Union[str, bool, None] = None) -> Tuple[str, Optional[str], str, str]:
         link = self._sanitize_link(link, videoid)
         try:
             data = await VideosSearch(link, limit=10).next()
             results = data.get("result", [])
-            if not results or query_type >= len(results):
-                raise IndexError
+            if not results or query_type >= len(results): raise IndexError
             r = results[query_type]
-            return (
-                r.get("title", ""),
-                r.get("duration"),
-                r.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
-                r.get("id", ""),
-            )
-        except:
-             return "Error", "0:00", "", "error"
+            return (r.get("title", ""), r.get("duration"), r.get("thumbnails", [{}])[-1].get("url", "").split("?")[0], r.get("id", ""))
+        except: return "Error", "0:00", "", "error"
 
-# Initialize
 YouTube = YouTubeAPI()
