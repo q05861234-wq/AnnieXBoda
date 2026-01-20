@@ -1,4 +1,6 @@
-# Authored By Certified Coders © 2025 (Hyper-Sonic Edition for 50GB/16Core)
+# Authored By Certified Coders © 2025
+# Integrated with TitanOS Hyper-Sonic Engine (Aria2 + Smart Spoofing)
+
 import asyncio
 import contextlib
 import json
@@ -6,6 +8,7 @@ import os
 import re
 import shutil
 import time
+import random
 from typing import Dict, List, Optional, Tuple, Union
 from concurrent.futures import ThreadPoolExecutor
 
@@ -14,6 +17,7 @@ from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message
 from youtubesearchpython.aio import VideosSearch, Playlist
 
+# --- AnnieX Imports (Do Not Remove) ---
 from AnnieXMedia.utils.cookie_handler import COOKIE_PATH
 from AnnieXMedia.utils.database import is_on_off
 from AnnieXMedia.utils.errors import capture_internal_err
@@ -31,33 +35,34 @@ _formats_lock = asyncio.Lock()
 # === Constants ===
 YOUTUBE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
 
-# === HYPER CONFIGURATION (Optimized for your Server) ===
+# === HYPER CONFIGURATION ===
 class UltraConfig:
     DOWNLOAD_PATH = os.path.abspath("downloads")
     
-    # 16 Cores * 4 Threads = 64 Workers (Maximum Efficiency)
+    # 16 Cores * 4 Threads = 64 Workers (Maximum Performance)
     MAX_WORKERS = 64
     
-    # إعدادات مخصصة لسرعة 2.6Gbps ورام 50GB
+    # إعدادات Aria2 للسرعة الجنونية (2.6Gbps Optimized)
     ARIA2_ARGS = [
         "-c", 
-        "-x", "16",           # Max connection per server
-        "-s", "16",           # Split to 16 parts
-        "-j", "64",           # Max concurrent downloads (Higher because you have CPU)
-        "-k", "2M",           # Chunk size 2MB (Better for high speed)
+        "-x", "16",           
+        "-s", "16",           
+        "-j", "64",           
+        "-k", "2M",           
         "--min-split-size=1M", 
         "--file-allocation=none", 
-        "--buffer-size=1024M", # 1GB RAM Buffer (استغلال الرامات الجبارة لتقليل الضغط على الهارد)
+        "--buffer-size=1024M", # 1GB RAM Buffer
         "--quiet=true",
-        "--max-tries=3",      # Retry fast
+        "--max-tries=3",
         "--connect-timeout=10"
     ]
     
-    # Anti-SABR (خداع يوتيوب)
+    # التريكة السحرية لحل مشاكل التنسيق والحظر
+    # بنقول لليوتيوب إننا "أندرويد" أو "iOS" عشان يفتح السرعة ويعدي الحظر
     EXTRACTOR_ARGS = {
         'youtube': {
-            'player_client': ['android', 'ios'],
-            'player_skip': ['web', 'tv'],
+            'skip': ['dash', 'hls'],
+            'player_client': ['android', 'ios', 'web'], # الترتيب مهم
             'include_ssl_logs': [False] 
         }
     }
@@ -67,19 +72,25 @@ if not os.path.exists(UltraConfig.DOWNLOAD_PATH):
 
 # === Helpers ===
 def _cookiefile_path() -> Optional[str]:
+    # 1. Check AnnieX Path
     path = str(COOKIE_PATH)
     try:
         if path and os.path.exists(path) and os.path.getsize(path) > 0:
             return path
     except Exception:
         pass
+    
+    # 2. Fallback Paths
+    fallback_paths = ["cookies.txt", "cookies/cookies.txt"]
+    for p in fallback_paths:
+        if os.path.exists(p) and os.path.getsize(p) > 0:
+            return os.path.abspath(p)
+            
     return None
-
 
 def _cookies_args() -> List[str]:
     path = _cookiefile_path()
     return ["--cookies", path] if path else []
-
 
 async def _exec_proc(*args: str) -> Tuple[bytes, bytes]:
     proc = await asyncio.create_subprocess_exec(
@@ -93,6 +104,13 @@ async def _exec_proc(*args: str) -> Tuple[bytes, bytes]:
         with contextlib.suppress(Exception):
             proc.kill()
         return b"", b"timeout"
+
+def get_user_agent():
+    agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15",
+    ]
+    return random.choice(agents)
 
 
 @capture_internal_err
@@ -129,12 +147,12 @@ class YouTubeAPI:
         self.playlist_url = "https://youtube.com/playlist?list="
         self._url_pattern = re.compile(r"(?:youtube\.com|youtu\.be)")
         
-        # تشغيل المحرك بقوة 64 خيط معالجة
+        # Engine Core
         self.pool = ThreadPoolExecutor(max_workers=UltraConfig.MAX_WORKERS)
         self.has_aria2 = shutil.which("aria2c") is not None
         
         if self.has_aria2:
-             print("🚀 HYPER-SONIC ENGINE: ONLINE | 50GB RAM Optimized | 2.6Gbps Uplink")
+             print("🚀 TITANIUM ENGINE: ONLINE | Anti-Format-Error ACTIVE | 2.6Gbps Ready")
 
     def _prepare_link(self, link: str, videoid: Union[str, bool, None] = None) -> str:
         if isinstance(videoid, str) and videoid.strip():
@@ -166,16 +184,6 @@ class YouTubeAPI:
                 if ent.type == MessageEntityType.TEXT_LINK:
                     return ent.url.split("&si")[0]
         return None
-
-    async def _ensure_watch_url(self, maybe_query_or_url: str) -> Optional[str]:
-        prepared = self._prepare_link(maybe_query_or_url)
-        if prepared.startswith("http"):
-            return prepared
-        data = await cached_youtube_search(prepared)
-        if not data:
-            return None
-        vid = data[0].get("id")
-        return self.base_url + vid if vid else None
 
     # === Metadata Fetching ===
     @capture_internal_err
@@ -209,7 +217,7 @@ class YouTubeAPI:
         try:
             info = await self._fetch_video_info(prepared_link)
             if not info:
-                raise ValueError("No results from youtubesearchpython (VideosSearch)")
+                raise ValueError("No results")
         except Exception as search_err:
             raise ValueError("Video not found", {"cause": str(search_err)}) from search_err
 
@@ -247,34 +255,15 @@ class YouTubeAPI:
         try:
             info = await self._fetch_video_info(prepared_link)
             if not info:
-                raise ValueError(
-                    f"No results from youtubesearchpython (VideosSearch) "
-                    f"for query/URL: '{prepared_link}'"
-                )
-        except Exception as search_err:
+                raise ValueError(f"No results for: '{prepared_link}'")
+        except Exception:
+            # Fallback to yt-dlp metadata if search fails
             stdout, stderr = await _exec_proc(
                 "yt-dlp", *(_cookies_args()), "--dump-json", "--no-warnings", prepared_link
             )
-
-            def _both_failed(details: str) -> ValueError:
-                return ValueError(
-                    f"Both methods failed for '{prepared_link}':\n"
-                    f"  1. youtubesearchpython error: {search_err}\n"
-                    f"{details}"
-                )
-
             if not stdout:
-                stderr_msg = stderr.decode().strip() if stderr else "Empty response"
-                raise _both_failed(f"  2. yt-dlp error: {stderr_msg}")
-
-            try:
-                info = json.loads(stdout.decode())
-            except json.JSONDecodeError as json_err:
-                raw = stdout.decode()[:400]
-                raise _both_failed(
-                    f"  2. yt-dlp JSON error: {json_err}\n"
-                    f"     Raw: {raw}..."
-                ) from json_err
+                raise ValueError("Both search and yt-dlp failed")
+            info = json.loads(stdout.decode())
 
         thumb = (
             info.get("thumbnail")
@@ -285,11 +274,7 @@ class YouTubeAPI:
             "title": info.get("title", ""),
             "link": info.get("webpage_url", prepared_link),
             "vidid": info.get("id", ""),
-            "duration_min": (
-                info.get("duration")
-                if isinstance(info.get("duration"), str)
-                else None
-            ),
+            "duration_min": (info.get("duration") if isinstance(info.get("duration"), str) else None),
             "thumb": thumb,
         }
         return details, info.get("id", "")
@@ -308,7 +293,7 @@ class YouTubeAPI:
         )
         return (1, stdout.decode().split("\n")[0]) if stdout else (0, stderr.decode())
 
-    # === TURBO PLAYLIST FETCHING ===
+    # === TURBO PLAYLIST FETCHING (Hybrid) ===
     @capture_internal_err
     async def playlist(
         self, link: str, limit: int, user_id, videoid: Union[str, bool, None] = None
@@ -325,7 +310,7 @@ class YouTubeAPI:
         except Exception:
             pass
 
-        # استخدام Threads في البحث كمان عشان السرعة
+        # Fast fetch via Shell Command
         def _get_pl():
             import subprocess
             cmd = [
@@ -339,13 +324,13 @@ class YouTubeAPI:
                 "--compat-options", "no-youtube-unavailable-videos",
                 link
             ]
-            return subprocess.check_output(cmd).decode().strip().split("\n")
+            try:
+                return subprocess.check_output(cmd).decode().strip().split("\n")
+            except:
+                return []
 
-        try:
-            items = await asyncio.get_running_loop().run_in_executor(self.pool, _get_pl)
-            return [i for i in items if i]
-        except:
-            return []
+        items = await asyncio.get_running_loop().run_in_executor(self.pool, _get_pl)
+        return [i for i in items if i]
 
     @capture_internal_err
     async def formats(
@@ -360,10 +345,7 @@ class YouTubeAPI:
             if cached and now - cached[0] < YOUTUBE_META_TTL:
                 return cached[1], cached[2]
 
-        opts = {"quiet": True}
-        if cf := _cookiefile_path():
-            opts["cookiefile"] = cf
-
+        opts = {"quiet": True, "cookiefile": _cookiefile_path()}
         out: List[Dict] = []
         try:
             def _get_formats():
@@ -373,25 +355,15 @@ class YouTubeAPI:
             info = await asyncio.get_running_loop().run_in_executor(self.pool, _get_formats)
             
             for fmt in info.get("formats", []):
-                if "dash" in str(fmt.get("format", "")).lower():
-                    continue
-                if not any(k in fmt for k in ("filesize", "filesize_approx")):
-                    continue
-                if not all(k in fmt for k in ("format", "format_id", "ext", "format_note")):
-                    continue
-                size = fmt.get("filesize") or fmt.get("filesize_approx")
-                if not size:
-                    continue
-                out.append(
-                    {
-                        "format": fmt["format"],
-                        "filesize": size,
-                        "format_id": fmt["format_id"],
-                        "ext": fmt["ext"],
-                        "format_note": fmt["format_note"],
-                        "yturl": link,
-                    }
-                )
+                if not any(k in fmt for k in ("filesize", "filesize_approx")): continue
+                out.append({
+                    "format": fmt.get("format"),
+                    "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
+                    "format_id": fmt.get("format_id"),
+                    "ext": fmt.get("ext"),
+                    "format_note": fmt.get("format_note"),
+                    "yturl": link,
+                })
         except Exception:
             pass
 
@@ -409,9 +381,7 @@ class YouTubeAPI:
         data = await VideosSearch(self._prepare_link(link, videoid), limit=10).next()
         results = data.get("result", [])
         if not results or query_type >= len(results):
-            raise IndexError(
-                f"Query type index {query_type} out of range (found {len(results)} results)"
-            )
+            raise IndexError("Query index out of range")
         r = results[query_type]
         return (
             r.get("title", ""),
@@ -420,7 +390,7 @@ class YouTubeAPI:
             r.get("id", ""),
         )
 
-    # === HYPER DOWNLOAD (The Beast) ===
+    # === TITAN DOWNLOADER (The Main Fix) ===
     @capture_internal_err
     async def download(
         self,
@@ -434,14 +404,14 @@ class YouTubeAPI:
         link = self._prepare_link(link, videoid)
         loop = asyncio.get_running_loop()
 
-        # Live Stream Handling
+        # Handle Live Streams (Direct)
         if await self.is_live(link):
             status, stream_url = await self.video(link)
             if status == 1:
                 return stream_url, None
             return None, None
 
-        # Generate ID
+        # Generate File Path
         try:
             match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", link)
             vid_id = match.group(1) if match else str(int(time.time()))
@@ -451,22 +421,31 @@ class YouTubeAPI:
         ext = "mp4" if video else "m4a"
         final_path = os.path.join(UltraConfig.DOWNLOAD_PATH, f"{vid_id}.{ext}")
 
-        # Check Cache
+        # Instant Cache Hit
         if os.path.exists(final_path):
              return final_path, True
 
-        # Background Downloader
+        # === THE CORE FIX ===
         def _execute_dl():
+            # إعدادات خاصة لحل مشكلة التنسيقات
             opts = {
                 "outtmpl": os.path.join(UltraConfig.DOWNLOAD_PATH, f"{vid_id}.%(ext)s"),
                 "cookiefile": _cookiefile_path(),
                 "geo_bypass": True,
                 "nocheckcertificate": True,
                 "quiet": True,
+                "no_warnings": True,
+                "ignoreerrors": True,
+                # Aria2 Integration
                 "external_downloader": "aria2c" if self.has_aria2 else None,
                 "external_downloader_args": UltraConfig.ARIA2_ARGS if self.has_aria2 else None,
-                "format": "bestvideo+bestaudio/best" if video else "bestaudio[ext=m4a]/bestaudio/best",
+                # Smart Format Selection (The Fix)
+                # لو فيديو: هات أفضل جودة 720، لو مفيش هات أفضل فيديو بصوت، لو مفيش هات أفضل جودة وخلاص
+                # لو صوت: هات أفضل صوت m4a، لو مفيش هات أفضل صوت، لو مفيش هات أفضل حاجة
+                "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best" if video else "bestaudio[ext=m4a]/bestaudio/best",
+                # Client Spoofing (Anti-Block)
                 "extractor_args": UltraConfig.EXTRACTOR_ARGS,
+                "user_agent": get_user_agent(),
                 "writethumbnail": False
             }
 
@@ -474,24 +453,23 @@ class YouTubeAPI:
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     ydl.download([link])
             except Exception as e:
-                print(f"DL Error: {e}")
+                print(f"TitanDL Error: {e}")
 
-        # Start Download in Thread Pool
+        # Run Download in Background
         loop.run_in_executor(self.pool, _execute_dl)
 
-        # Streaming Watcher (Zero Latency)
+        # Zero Latency Watcher
         start_time = time.time()
         found_file = None
         
-        # Reduced timeout logic because your internet is fast
-        while time.time() - start_time < 30: 
+        while time.time() - start_time < 40: # 40s Timeout
             for f_name in os.listdir(UltraConfig.DOWNLOAD_PATH):
                 if f_name.startswith(vid_id):
                     f_path = os.path.join(UltraConfig.DOWNLOAD_PATH, f_name)
                     
                     if f_name.endswith(".aria2"):
                         real_file = f_path.replace(".aria2", "")
-                        # 1MB buffer is nothing for your speed, streaming starts instantly
+                        # 1MB Buffer is enough for your speed
                         if os.path.exists(real_file) and os.path.getsize(real_file) > 1024 * 1024: 
                             found_file = real_file
                             break
@@ -505,6 +483,6 @@ class YouTubeAPI:
             if found_file:
                 return found_file, True
             
-            await asyncio.sleep(0.05) # Check every 50ms (Super Fast)
+            await asyncio.sleep(0.05) 
 
         return None, None
