@@ -1,8 +1,7 @@
 # ==============================================================================
-#  TITANIUM ULTIMATE (SAFE MODE) © 2026
-#  Strategy: Multi-Client Rotation (iPad -> Studio -> Android -> TV)
-#  Engine: Aria2 Optimized (2.6Gbps)
-#  Code Style: Expanded & Safe (No One-Liners)
+#  TITANIUM RESILIENCE (PROXY AUTO-SWITCH) © 2026
+#  Strategy: Try Proxy -> If Blocked -> Force Direct Connection
+#  Clients: iPad (Speed) -> Android (Standard) -> TV (Bypass)
 # ==============================================================================
 
 import asyncio
@@ -42,7 +41,7 @@ class SystemConfig:
     DOWNLOAD_PATH = os.path.abspath("downloads")
     MAX_WORKERS = 16
     
-    # إعدادات السرعة القصوى (Aria2)
+    # إعدادات السرعة (Aria2)
     ARIA2_ARGS = [
         "-c", "-x", "16", "-s", "16", "-j", "64", "-k", "10M",
         "--min-split-size=10M", "--file-allocation=none", 
@@ -98,7 +97,7 @@ class YouTubeAPI:
         self.cookie = get_cookie_file()
         self.proxy = get_formatted_proxy()
         
-        LOGGER("Core").info(f"🚀 TITANIUM ULTIMATE: ACTIVE | Multi-Client Rotation")
+        LOGGER("Core").info(f"🚀 TITANIUM RESILIENCE: ONLINE | Smart Proxy Switching")
 
     def _sanitize_link(self, link: str, videoid: Union[str, bool, None] = None) -> str:
         if isinstance(videoid, str) and videoid.strip():
@@ -129,29 +128,23 @@ class YouTubeAPI:
                 return os.path.join(SystemConfig.DOWNLOAD_PATH, f), True
 
         # ======================================================================
-        #  GLOBAL CONFIGURATION
+        #  BASE CONFIG
         # ======================================================================
         base_opts = {
             "outtmpl": os.path.join(SystemConfig.DOWNLOAD_PATH, f"{vid_id}.%(ext)s"),
             "cookiefile": self.cookie,
-            "proxy": self.proxy,
             "geo_bypass": True,
             "nocheckcertificate": True,
             "quiet": True,
             "ignoreerrors": True,
-            # Aria2 Speed
             "external_downloader": "aria2c" if self.has_aria2 else None,
             "external_downloader_args": SystemConfig.ARIA2_ARGS if self.has_aria2 else None,
         }
 
-        # ======================================================================
-        #  SMART FORMATS (No Hard-coding)
-        # ======================================================================
         if video:
             base_opts["format"] = "bestvideo+bestaudio/best"
             base_opts["merge_output_format"] = "mp4"
         else:
-            # الأولوية: M4A > MP3 > أي حاجة تانية
             base_opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best"
             base_opts["postprocessors"] = [{
                 'key': 'FFmpegExtractAudio',
@@ -159,64 +152,55 @@ class YouTubeAPI:
                 'preferredquality': '192',
             }]
 
+        # ======================================================================
+        #  SMART EXECUTION (THE FIX)
+        # ======================================================================
         def _execute_dl():
-            # --- المحاولة 1: iPad Pro (السرعة) ---
-            try:
-                LOGGER("Titanium").info("⚡ Trying Client: iPad Pro...")
-                opts = base_opts.copy()
-                opts["extractor_args"] = {"youtube": {"player_client": ["ios", "web"]}}
-                opts["user_agent"] = "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
-                
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    ydl.download([link])
-                
-                if self._check_file(vid_id):
-                    return self._check_file(vid_id)
-            except Exception:
-                pass
+            # دالة مساعدة لتجربة التحميل
+            def try_download(options, client_name):
+                try:
+                    # إضافة العميل
+                    if client_name == "ios":
+                        options["extractor_args"] = {"youtube": {"player_client": ["ios", "web"]}}
+                    elif client_name == "android":
+                        options["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
+                    elif client_name == "tv":
+                        options["extractor_args"] = {"youtube": {"player_client": ["tv"]}}
 
-            # --- المحاولة 2: Android Creator (الاستوديو) ---
-            try:
-                LOGGER("Titanium").info("🛡️ Trying Client: Studio (Creator)...")
-                opts = base_opts.copy()
-                opts["extractor_args"] = {"youtube": {"player_client": ["android_creator"]}}
-                opts["user_agent"] = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
-                
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    ydl.download([link])
-                
-                if self._check_file(vid_id):
-                    return self._check_file(vid_id)
-            except Exception:
-                pass
+                    with yt_dlp.YoutubeDL(options) as ydl:
+                        ydl.download([link])
+                    
+                    if self._check_file(vid_id):
+                        return True
+                except Exception as e:
+                    LOGGER("Titanium").warning(f"Failed with {client_name}: {e}")
+                return False
 
-            # --- المحاولة 3: Android Standard (القياسي) ---
-            try:
-                LOGGER("Titanium").info("📱 Trying Client: Android Standard...")
-                opts = base_opts.copy()
-                opts["extractor_args"] = {"youtube": {"player_client": ["android"]}}
+            # --- السيناريو الأول: استخدام البروكسي (لو موجود) ---
+            if self.proxy:
+                LOGGER("Titanium").info("🌐 Trying WITH PROXY...")
+                proxy_opts = base_opts.copy()
+                proxy_opts["proxy"] = self.proxy
                 
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    ydl.download([link])
-                
-                if self._check_file(vid_id):
-                    return self._check_file(vid_id)
-            except Exception:
-                pass
+                # نجرب iPad
+                if try_download(proxy_opts, "ios"): return self._check_file(vid_id)
+                # نجرب Android (العادي مش Creator)
+                if try_download(proxy_opts, "android"): return self._check_file(vid_id)
+            
+            # --- السيناريو الثاني: إلغاء البروكسي (Direct Connection) ---
+            # لو فشل فوق، أو مفيش بروكسي أصلاً، جرب الاتصال المباشر
+            # ده بيحل المشكلة لو البروكسي محروق
+            LOGGER("Titanium").info("🔌 Proxy Failed/Missing. Trying DIRECT CONNECTION...")
+            direct_opts = base_opts.copy()
+            if "proxy" in direct_opts: del direct_opts["proxy"] # تأكد من حذف البروكسي
 
-            # --- المحاولة 4: TV (الحل الأخير) ---
-            try:
-                LOGGER("Titanium").info("📺 Trying Client: TV Mode...")
-                opts = base_opts.copy()
-                opts["extractor_args"] = {"youtube": {"player_client": ["tv"]}}
-                
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    ydl.download([link])
-                
-                if self._check_file(vid_id):
-                    return self._check_file(vid_id)
-            except Exception:
-                pass
+            # نجرب Android المباشر
+            if try_download(direct_opts, "android"): return self._check_file(vid_id)
+            
+            # --- السيناريو الثالث: TV Mode (بدون بروكسي) ---
+            # الملاذ الأخير
+            LOGGER("Titanium").info("📺 Last Resort: TV Mode (Direct)...")
+            if try_download(direct_opts, "tv"): return self._check_file(vid_id)
 
             return None
 
@@ -263,7 +247,6 @@ class YouTubeAPI:
         if videoid:
             link = f"https://youtube.com/playlist?list={videoid}"
         cmd = ["yt-dlp", "--flat-playlist", "--get-id", "--playlist-end", str(limit), "--ignore-errors", "--no-warnings", 
-               # iPad User Agent for Playlist
                "--user-agent", "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
                link]
         if self.cookie:
