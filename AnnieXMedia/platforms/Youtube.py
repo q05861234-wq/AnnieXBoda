@@ -1,8 +1,7 @@
 # ==============================================================================
-#  INFINITY-TITANIUM HYBRID ENGINE © 2026
-#  Identity: Google Pixel 10 Pro (Stable Android 16)
-#  Network: 5G+ Priority | Mode: RAW DIRECT STREAM (Zero Latency)
-#  Merged Features: Force Aria2 16x | Smart Format Detection
+#  LIGHT SPEED ENGINE (SILICON CORE) © 2026
+#  Identity: iPhone 17 Pro Max (iOS 18) | Network: Unthrottled 5G
+#  Status: NO CONVERSION | RAW STREAM | ZERO LATENCY
 # ==============================================================================
 
 import asyncio
@@ -22,7 +21,7 @@ from pyrogram.types import Message
 from youtubesearchpython.aio import VideosSearch, Playlist
 
 # ==============================================================================
-#  SECTION 1: ENVIRONMENT & PERFORMANCE
+#  SECTION 1: ENVIRONMENT & OPTIMIZATION
 # ==============================================================================
 
 logging.basicConfig(level=logging.ERROR)
@@ -41,39 +40,42 @@ except ImportError:
     YOUTUBE_META_MAX = 5000
     YOUTUBE_META_TTL = 3600
 
-# MUTE LOGS FOR EXTREME SPEED
+# KILL ALL LOGS FOR MAX SPEED
 logging.getLogger("yt_dlp").setLevel(logging.CRITICAL)
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 # ==============================================================================
-#  SECTION 2: PIXEL 10 PRO IDENTITY & 5G+ CONFIG
+#  SECTION 2: iOS SILICON CONFIGURATION (THE FIX)
 # ==============================================================================
 
 class SystemConfig:
     DOWNLOAD_PATH = os.path.abspath("downloads")
-    MAX_WORKERS = (os.cpu_count() or 4) * 16  # Max Parallel Threads
+    # Balance threads to avoid CPU choking
+    MAX_WORKERS = (os.cpu_count() or 4) * 8
     
-    # === 5G+ GOD MODE ARIA2 ===
+    # === ARIA2 ULTRA SETTINGS ===
     ARIA2_ARGS = [
         "-c", "-x", "16", "-s", "16", "-j", "32", "-k", "1M",
-        "--buffer-size=1024M", "--file-allocation=none", "--quiet=true",
-        "--max-connection-per-server=16", "--min-split-size=1M"
+        "--buffer-size=1024M",      # Massive RAM Buffer
+        "--file-allocation=none",   # Instant Disk Write
+        "--quiet=true",
+        "--max-connection-per-server=16"
     ]
     
-    # === IDENTITY: PIXEL 10 PRO (STABLE RELEASE) ===
-    # Triggers "Android Priority" -> Returns light & fast Opus/WebM streams
+    # === IDENTITY: iPHONE 17 PRO MAX ===
+    # This bypasses the throttling you faced with Pixel/Android
     NATIVE_AGENTS = [
-        "Mozilla/5.0 (Linux; Android 16; Pixel 10 Pro Build/TP1A.251005.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7200.0 Mobile Safari/537.36",
-        "Mozilla/5.0 (Linux; Android 16; Pixel 10 Pro Build/TP1A.250915.008) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.7150.12 Mobile Safari/537.36",
-        "Mozilla/5.0 (Linux; Android 16; Pixel 10 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36"
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
     ]
 
 if not os.path.exists(SystemConfig.DOWNLOAD_PATH):
     os.makedirs(SystemConfig.DOWNLOAD_PATH)
 
 # ==============================================================================
-#  SECTION 3: INSTANT CACHE SYSTEM
+#  SECTION 3: LIGHTWEIGHT CACHE
 # ==============================================================================
 
 _meta_cache: Dict[str, Tuple[float, Dict]] = {}
@@ -105,7 +107,7 @@ async def _exec_shell(*args: str) -> Tuple[bytes, bytes]:
         return b"", b"timeout"
 
 # ==============================================================================
-#  SECTION 4: CORE ENGINE (MERGED LOGIC)
+#  SECTION 4: CORE ENGINE (iOS API)
 # ==============================================================================
 
 class YouTubeAPI:
@@ -119,7 +121,7 @@ class YouTubeAPI:
         self.has_aria2 = shutil.which("aria2c") is not None
         
         if self.has_aria2:
-            LOGGER("Core").info("Hybrid Engine: Pixel 10 Pro + Aria2 16x (Ready) 🚀")
+            LOGGER("Core").info("Light Speed Engine: iOS Silicon Core (Unthrottled) 🚀")
 
     def _sanitize_link(self, link: str, videoid: Union[str, bool, None] = None) -> str:
         if isinstance(videoid, str) and videoid.strip():
@@ -127,16 +129,13 @@ class YouTubeAPI:
         link = link.strip()
         if "youtu.be" in link:
             link = self.base_url + link.split("/")[-1].split("?")[0]
-        elif "youtube.com/shorts/" in link or "youtube.com/live/" in link:
-            link = self.base_url + link.split("/")[-1].split("?")[0]
         return link.split("&")[0]
 
     # --- URL & CHECK ---
     async def exists(self, link: str, videoid: Union[str, bool, None] = None) -> bool:
-        return True # Bypass regex check for speed
+        return True 
 
     async def url(self, message: Message) -> Optional[str]:
-        # Fast extraction logic
         if message.text and "http" in message.text:
             match = re.search(r"(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/[^\s]+", message.text)
             return match.group(0) if match else None
@@ -197,7 +196,7 @@ class YouTubeAPI:
         return d.get("thumb", "")
 
     # ==========================================================================
-    #  THE HYBRID DOWNLOADER (RAW SPEED + SMART FORMATS)
+    #  THE DOWNLOADER (iOS DIRECT STREAM - THE FIX)
     # ==========================================================================
     async def download(
         self, link: str, mystic, *, video: Union[bool, str, None] = None, videoid: Union[str, bool, None] = None,
@@ -211,29 +210,32 @@ class YouTubeAPI:
             vid_id = match.group(1) if match else str(int(time.time()))
         except: vid_id = str(int(time.time()))
 
-        # 1. SMART SCANNER: Check if ANY format exists (No Redownload)
-        # This checks for WebM (Pixel default), M4A (iPhone default), or MP3/MP4
-        for ext in ['webm', 'm4a', 'opus', 'mp4', 'mp3', 'mkv']:
+        # 1. SMART SCANNER (Accepts All Formats)
+        for ext in ['m4a', 'webm', 'mp4', 'opus', 'mp3', 'mkv']:
             final_path = os.path.join(SystemConfig.DOWNLOAD_PATH, f"{vid_id}.{ext}")
             if os.path.exists(final_path): return final_path, True
 
-        # 2. RAW CONFIGURATION (Maximum Speed)
+        # 2. iOS SILICON CONFIGURATION
         opts = {
-            # Save as ID.extension (Let YouTube decide the best extension)
             "outtmpl": os.path.join(SystemConfig.DOWNLOAD_PATH, f"{vid_id}.%(ext)s"),
             "cookiefile": get_cookie_file(),
             "geo_bypass": True, "nocheckcertificate": True,
             "quiet": True, "no_warnings": True, "ignoreerrors": True,
             "force_ipv4": True,
             
-            # IDENTITY: PIXEL 10 PRO STABLE (Best Priority)
+            # THE MAGIC: Use iOS Client API (No Throttling)
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["ios", "web_creator"],
+                    "skip": ["dash", "hls"]
+                }
+            },
             "user_agent": random.choice(SystemConfig.NATIVE_AGENTS),
             
             "socket_timeout": 30,
             "retries": 15,
             
-            # CRITICAL FOR SPEED: Disable FFmpeg Conversion
-            # We will play the raw file (WebM/Opus) directly
+            # NO CONVERSION = LIGHT SPEED
             "prefer_ffmpeg": False,
         }
 
@@ -242,21 +244,20 @@ class YouTubeAPI:
             opts["external_downloader"] = "aria2c"
             opts["external_downloader_args"] = SystemConfig.ARIA2_ARGS
 
-        # 4. UNIVERSAL FORMAT LOGIC
+        # 4. FORMAT SELECTION (Optimized for iOS)
         if video:
             opts["format"] = "bestvideo+bestaudio/best"
-            opts["merge_output_format"] = "mp4" # Merge only if video requested
+            opts["merge_output_format"] = "mp4"
         else:
-            # "bestaudio" with Pixel Agent = Opus/WebM (Fastest Stream available)
-            # We DO NOT force m4a here to avoid conversion lag.
-            opts["format"] = "bestaudio/best"
+            # iOS Native Format (M4A) is the fastest to stream on this API
+            opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
 
         def _execute_dl():
             with yt_dlp.YoutubeDL(opts) as ydl:
                 try: ydl.download([link])
                 except Exception as e: LOGGER("DL").error(f"DL Error: {e}")
             
-            # 5. SMART DISCOVERY: Find whatever file landed
+            # 5. FINAL DISCOVERY
             for f in os.listdir(SystemConfig.DOWNLOAD_PATH):
                 if f.startswith(vid_id):
                     return os.path.join(SystemConfig.DOWNLOAD_PATH, f)
@@ -271,7 +272,9 @@ class YouTubeAPI:
         link = self._sanitize_link(link, videoid)
         cookie = get_cookie_file()
         cookies_arg = ["--cookies", cookie] if cookie else []
-        stdout, stderr = await _exec_shell("yt-dlp", *cookies_arg, "-g", "-f", "best[height<=?1080]", link)
+        # iOS User Agent for Stream URL
+        ios_ua = SystemConfig.NATIVE_AGENTS[0]
+        stdout, stderr = await _exec_shell("yt-dlp", "--user-agent", ios_ua, *cookies_arg, "-g", "-f", "best[height<=?1080]", link)
         return (1, stdout.decode().split("\n")[0]) if stdout else (0, stderr.decode())
     video = video_stream_url 
 
