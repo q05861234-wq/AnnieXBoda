@@ -1,7 +1,8 @@
 # ==============================================================================
-#  TITANIUM ULTIMATE (MULTI-CLIENT ROTATION) © 2026
-#  Clients: iPad -> Studio (Creator) -> Android -> TV
-#  Strategy: Adaptive Formats + 2.6Gbps Aria2
+#  TITANIUM ULTIMATE (SAFE MODE) © 2026
+#  Strategy: Multi-Client Rotation (iPad -> Studio -> Android -> TV)
+#  Engine: Aria2 Optimized (2.6Gbps)
+#  Code Style: Expanded & Safe (No One-Liners)
 # ==============================================================================
 
 import asyncio
@@ -60,16 +61,21 @@ YOUTUBE_META_TTL = 3600
 # ------------------------------------------------------------------------------
 
 def get_formatted_proxy() -> Optional[str]:
-    if not os.path.exists("proxies.txt"): return None
+    if not os.path.exists("proxies.txt"):
+        return None
     try:
         with open("proxies.txt", "r") as f:
             lines = [line.strip() for line in f if line.strip()]
-        if not lines: return None
+        if not lines:
+            return None
         raw = random.choice(lines)
-        if "@" in raw: return raw
+        if "@" in raw:
+            return raw
         parts = raw.split(':')
-        if len(parts) == 4: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-    except: pass
+        if len(parts) == 4:
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+    except:
+        pass
     return None
 
 def get_cookie_file() -> Optional[str]:
@@ -161,9 +167,13 @@ class YouTubeAPI:
                 opts["extractor_args"] = {"youtube": {"player_client": ["ios", "web"]}}
                 opts["user_agent"] = "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
                 
-                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
-                if self._check_file(vid_id): return self._check_file(vid_id)
-            except Exception: pass
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([link])
+                
+                if self._check_file(vid_id):
+                    return self._check_file(vid_id)
+            except Exception:
+                pass
 
             # --- المحاولة 2: Android Creator (الاستوديو) ---
             try:
@@ -172,9 +182,13 @@ class YouTubeAPI:
                 opts["extractor_args"] = {"youtube": {"player_client": ["android_creator"]}}
                 opts["user_agent"] = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
                 
-                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
-                if self._check_file(vid_id): return self._check_file(vid_id)
-            except Exception: pass
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([link])
+                
+                if self._check_file(vid_id):
+                    return self._check_file(vid_id)
+            except Exception:
+                pass
 
             # --- المحاولة 3: Android Standard (القياسي) ---
             try:
@@ -182,9 +196,13 @@ class YouTubeAPI:
                 opts = base_opts.copy()
                 opts["extractor_args"] = {"youtube": {"player_client": ["android"]}}
                 
-                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
-                if self._check_file(vid_id): return self._check_file(vid_id)
-            except Exception: pass
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([link])
+                
+                if self._check_file(vid_id):
+                    return self._check_file(vid_id)
+            except Exception:
+                pass
 
             # --- المحاولة 4: TV (الحل الأخير) ---
             try:
@@ -192,19 +210,25 @@ class YouTubeAPI:
                 opts = base_opts.copy()
                 opts["extractor_args"] = {"youtube": {"player_client": ["tv"]}}
                 
-                with yt_dlp.YoutubeDL(opts) as ydl: ydl.download([link])
-                if self._check_file(vid_id): return self._check_file(vid_id)
-            except Exception: pass
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([link])
+                
+                if self._check_file(vid_id):
+                    return self._check_file(vid_id)
+            except Exception:
+                pass
 
             return None
 
         downloaded_file = await loop.run_in_executor(self.pool, _execute_dl)
-        if downloaded_file: return downloaded_file, True
+        if downloaded_file:
+            return downloaded_file, True
         return None, None
 
     def _check_file(self, vid_id):
         for f in os.listdir(SystemConfig.DOWNLOAD_PATH):
-            if f.startswith(vid_id): return os.path.join(SystemConfig.DOWNLOAD_PATH, f)
+            if f.startswith(vid_id):
+                return os.path.join(SystemConfig.DOWNLOAD_PATH, f)
         return None
 
     # --------------------------------------------------------------------------
@@ -215,78 +239,109 @@ class YouTubeAPI:
         async with _meta_lock:
             if prepared_link in _meta_cache:
                 ts, val = _meta_cache[prepared_link]
-                if time.time() - ts < YOUTUBE_META_TTL: return val['details'], val['vidid']
+                if time.time() - ts < YOUTUBE_META_TTL:
+                    return val['details'], val['vidid']
         try:
             search = VideosSearch(prepared_link, limit=1)
             res = await search.next()
             info = res["result"][0]
             details = {
-                "title": info.get("title", "Unknown"), "link": prepared_link, "vidid": info.get("id", ""),
-                "duration_min": info.get("duration", "0:00"), "thumb": info.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
+                "title": info.get("title", "Unknown"),
+                "link": prepared_link,
+                "vidid": info.get("id", ""),
+                "duration_min": info.get("duration", "0:00"),
+                "thumb": info.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
                 "channel": info.get("channel", {}).get("name", "Unknown")
             }
-            async with _meta_lock: _meta_cache[prepared_link] = (time.time(), {'details': details, 'vidid': info.get("id", "")})
+            async with _meta_lock:
+                _meta_cache[prepared_link] = (time.time(), {'details': details, 'vidid': info.get("id", "")})
             return details, info.get("id", "")
-        except: return {"title": "Error", "link": prepared_link, "vidid": "error", "duration_min": "0:00", "thumb": ""}, "error"
+        except:
+            return {"title": "Error", "link": prepared_link, "vidid": "error", "duration_min": "0:00", "thumb": ""}, "error"
 
     async def playlist(self, link: str, limit: int, user_id, videoid: Union[str, bool, None] = None) -> List[str]:
-        if videoid: link = f"https://youtube.com/playlist?list={videoid}"
+        if videoid:
+            link = f"https://youtube.com/playlist?list={videoid}"
         cmd = ["yt-dlp", "--flat-playlist", "--get-id", "--playlist-end", str(limit), "--ignore-errors", "--no-warnings", 
                # iPad User Agent for Playlist
                "--user-agent", "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
                link]
-        if self.cookie: cmd.extend(["--cookies", self.cookie])
+        if self.cookie:
+            cmd.extend(["--cookies", self.cookie])
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         stdout, _ = await proc.communicate()
-        if stdout: return stdout.decode().splitlines()
+        if stdout:
+            return stdout.decode().splitlines()
         try:
             plist = await Playlist.get(link)
-            if plist and plist.get("videos"): return [video["id"] for video in plist["videos"][:limit] if video.get("id")]
-        except: pass
+            if plist and plist.get("videos"):
+                return [video["id"] for video in plist["videos"][:limit] if video.get("id")]
+        except:
+            pass
         return []
 
     async def formats(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[List[Dict], str]:
         link = self._sanitize_link(link, videoid)
         opts = {"quiet": True, "cookiefile": self.cookie}
+        
         def _get():
             try:
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     return ydl.extract_info(link, download=False).get("formats", [])
             except:
                 return []
+                
         loop = asyncio.get_running_loop()
         raw_formats = await loop.run_in_executor(self.pool, _get)
         out = []
         for fmt in raw_formats:
-            if not fmt.get("filesize") and not fmt.get("filesize_approx"): continue
-            out.append({"format": fmt.get("format"), "filesize": fmt.get("filesize") or fmt.get("filesize_approx"), "format_id": fmt.get("format_id"), "ext": fmt.get("ext"), "format_note": fmt.get("format_note", ""), "yturl": link})
+            if not fmt.get("filesize") and not fmt.get("filesize_approx"):
+                continue
+            out.append({
+                "format": fmt.get("format"),
+                "filesize": fmt.get("filesize") or fmt.get("filesize_approx"),
+                "format_id": fmt.get("format_id"),
+                "ext": fmt.get("ext"),
+                "format_note": fmt.get("format_note", ""),
+                "yturl": link
+            })
         return out, link
 
     async def video(self, link: str, videoid: Union[str, bool, None] = None) -> Tuple[int, str]:
         link = self._sanitize_link(link, videoid)
         cmd = ["yt-dlp", "-g", "-f", "best[height<=?720]", link]
-        if self.cookie: cmd.extend(["--cookies", self.cookie])
+        if self.cookie:
+            cmd.extend(["--cookies", self.cookie])
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         stdout, stderr = await proc.communicate()
-        if stdout: return 1, stdout.decode().split("\n")[0]
+        if stdout:
+            return 1, stdout.decode().split("\n")[0]
         return 0, stderr.decode()
 
     async def details(self, link: str, videoid: Union[str, bool, None] = None):
         d, i = await self.track(link, videoid)
         return d["title"], d["duration_min"], time_to_seconds(d["duration_min"]), d["thumb"], i
-    async def title(self, link: str, videoid: Union[str, bool, None] = None): return (await self.track(link, videoid))[0].get("title")
-    async def duration(self, link: str, videoid: Union[str, bool, None] = None): return (await self.track(link, videoid))[0].get("duration_min")
-    async def thumbnail(self, link: str, videoid: Union[str, bool, None] = None): return (await self.track(link, videoid))[0].get("thumb")
+    async def title(self, link: str, videoid: Union[str, bool, None] = None):
+        return (await self.track(link, videoid))[0].get("title")
+    async def duration(self, link: str, videoid: Union[str, bool, None] = None):
+        return (await self.track(link, videoid))[0].get("duration_min")
+    async def thumbnail(self, link: str, videoid: Union[str, bool, None] = None):
+        return (await self.track(link, videoid))[0].get("thumb")
+
     async def slider(self, link: str, query_type: int, videoid: Union[str, bool, None] = None) -> Tuple[str, Optional[str], str, str]:
         try:
             res = (await VideosSearch(self._sanitize_link(link, videoid), limit=10).next())["result"][query_type]
             return res["title"], res["duration"], res["thumbnails"][0]["url"], res["id"]
-        except: return "Error", "0", "", "error"
+        except:
+            return "Error", "0", "", "error"
+
     async def url(self, message: Message) -> Optional[str]:
         if message.text and "http" in message.text:
             match = re.search(r"(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/[^\s]+", message.text)
             return match.group(0) if match else None
         return None
-    async def exists(self, link: str, videoid: Union[str, bool, None] = None) -> bool: return True
+
+    async def exists(self, link: str, videoid: Union[str, bool, None] = None) -> bool:
+        return True
 
 YouTube = YouTubeAPI()
